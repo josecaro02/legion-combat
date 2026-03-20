@@ -290,6 +290,190 @@ class UserRole(str, Enum):
 
 ---
 
+## Documentación de API con Flasgger
+
+### ¿Qué es Flasgger?
+
+[Flasgger](https://github.com/flasgger/flasgger) es una biblioteca Flask que genera automáticamente una interfaz **Swagger UI** a partir de docstrings YAML en los endpoints. Esto permite:
+
+1. **Explorar la API** de forma interactiva
+2. **Probar endpoints** directamente desde el navegador
+3. **Ver modelos de datos** esperados en requests/responses
+4. **Autenticación integrada** para probar endpoints protegidos
+
+### Configuración
+
+La configuración de Swagger se define en `app/config.py`:
+
+```python
+@classmethod
+def get_swagger_template(cls) -> dict:
+    return {
+        'swagger': '2.0',
+        'info': {
+            'title': 'Legión Combat API',
+            'description': 'Sistema de gestión para gimnasio de boxeo',
+            'version': '1.0.0',
+        },
+        'securityDefinitions': {
+            'Bearer': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'JWT Authorization header. Ejemplo: "Bearer {token}"'
+            }
+        },
+        'tags': [
+            {'name': 'Auth', 'description': 'Autenticación'},
+            {'name': 'Students', 'description': 'Gestión de estudiantes'},
+            ...
+        ]
+    }
+```
+
+En `app/__init__.py` se inicializa:
+
+```python
+from flasgger import Swagger
+
+Swagger(app, template=config.get_swagger_template())
+```
+
+### Cómo Documentar un Endpoint
+
+Los docstrings deben seguir el formato **YAML** con separador `---`:
+
+```python
+@student_bp.route('/', methods=['GET'])
+@jwt_required
+@require_professor
+def list_students():
+    """List students with optional filters.
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: course
+        in: query
+        type: string
+        enum: [boxing, kickboxing, both]
+    responses:
+      200:
+        description: List of students
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  first_name:
+                    type: string
+      401:
+        description: Unauthorized
+    """
+```
+
+### Elementos Importantes del YAML
+
+#### Tags
+Organizan los endpoints por categoría en la UI:
+```yaml
+tags:
+  - Students
+```
+
+#### Seguridad (JWT)
+Indica que el endpoint requiere autenticación:
+```yaml
+security:
+  - Bearer: []
+```
+
+#### Parámetros
+Definen inputs del endpoint:
+
+```yaml
+parameters:
+  # Parámetro de query string
+  - name: page
+    in: query
+    type: integer
+    default: 1
+
+  # Parámetro de URL
+  - name: student_id
+    in: path
+    type: string
+    format: uuid
+    required: true
+
+  # Body de la request (JSON)
+  - name: body
+    in: body
+    required: true
+    schema:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "owner@gym.com"
+```
+
+#### Respuestas
+Documentan los posibles códigos de respuesta:
+
+```yaml
+responses:
+  200:
+    description: Success
+    schema:
+      type: object
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+  401:
+    description: Authentication failed
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "AUTHENTICATION_ERROR"
+```
+
+### Acceso a Swagger UI
+
+Una vez iniciada la aplicación, la documentación está disponible en:
+
+- **Swagger UI**: `http://localhost:5000/apidocs/`
+- **OpenAPI JSON**: `http://localhost:5000/apispec_1.json`
+
+### Ventajas de esta Aproximación
+
+1. **Single Source of Truth**: La documentación vive junto al código
+2. **Siempre actualizada**: Si cambia el endpoint, se actualiza la doc
+3. **Testing interactivo**: No necesitas Postman para probar
+4. **Auto-generada**: No hay que mantener archivos OpenAPI/YAML separados
+
+---
+
 ## Escalabilidad
 
 ### Optimizaciones Actuales
@@ -389,6 +573,110 @@ if existing:
 **Problema:** Cambiar horario del lunes modifica clases pasadas.
 
 **Solución:** Nuestro sistema de versionado crea nuevo template para el futuro, preservando el pasado.
+
+---
+
+## Documentación de API con Swagger (Flasgger)
+
+### ¿Qué es Flasgger?
+
+**Flasgger** es una biblioteca Flask que genera automáticamente documentación Swagger/OpenAPI a partir de los docstrings YAML en los endpoints.
+
+### Configuración
+
+La configuración de Swagger se define en `app/config.py`:
+
+```python
+@classmethod
+def get_swagger_template(cls) -> dict:
+    return {
+        'swagger': '2.0',
+        'info': {
+            'title': 'Legión Combat API',
+            'description': 'Sistema de gestión para gimnasio de boxeo',
+            'version': '1.0.0',
+        },
+        'securityDefinitions': {
+            'Bearer': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'JWT Authorization header. Example: "Bearer {token}"'
+            }
+        },
+        'tags': [...]
+    }
+```
+
+En `app/__init__.py` se inicializa:
+
+```python
+from flasgger import Swagger
+
+Swagger(app, template=config.get_swagger_template())
+```
+
+### Documentación de Endpoints
+
+Cada endpoint se documenta con un docstring en formato YAML:
+
+```python
+@student_bp.route('/', methods=['POST'])
+def create_student():
+    """Create a new student.
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - first_name
+            - last_name
+            - course
+          properties:
+            first_name:
+              type: string
+              example: "Juan"
+            course:
+              type: string
+              enum: [boxing, kickboxing, both]
+    responses:
+      201:
+        description: Student created successfully
+      400:
+        description: Validation error
+    """
+    # ... código del endpoint
+```
+
+### Elementos Clave de la Documentación
+
+| Elemento | Descripción |
+|----------|-------------|
+| `tags` | Agrupa endpoints por categoría |
+| `security` | Indica que requiere JWT Bearer token |
+| `parameters` | Define query params, path params y body |
+| `responses` | Documenta códigos de respuesta y schemas |
+| `schema` | Define la estructura de datos esperada |
+
+### Uso de Swagger UI
+
+1. Iniciar la aplicación: `python run.py`
+2. Abrir navegador en: `http://localhost:5000/apidocs/`
+3. Explorar y probar endpoints directamente desde la UI
+
+### Ventajas
+
+- **Documentación viva**: Se actualiza automáticamente con el código
+- **Testing interactivo**: Prueba endpoints desde el navegador
+- **Standard**: Usa OpenAPI/Swagger, estándar de la industria
+- **Cliente API**: Exporta a Postman, genera clientes SDK
 
 ---
 

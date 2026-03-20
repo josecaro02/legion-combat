@@ -17,18 +17,65 @@ student_service = StudentService()
 @require_professor
 def list_students():
     """List students with optional filters.
-
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-        - course: Filter by course type (boxing, kickboxing, both)
-        - is_active: Filter by active status (true/false)
-
-    Returns:
-        - items: List of students
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: Page number
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+        maximum: 100
+        description: Items per page
+      - name: course
+        in: query
+        type: string
+        enum: [boxing, kickboxing, both]
+        description: Filter by course type
+      - name: is_active
+        in: query
+        type: boolean
+        description: Filter by active status
+    responses:
+      200:
+        description: List of students
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  first_name:
+                    type: string
+                  last_name:
+                    type: string
+                  course:
+                    type: string
+                    enum: [boxing, kickboxing, both]
+                  is_active:
+                    type: boolean
+            total:
+              type: integer
+            pages:
+              type: integer
+            current_page:
+              type: integer
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden - Professor access required
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -64,12 +111,39 @@ def list_students():
 @require_professor
 def search_students():
     """Search students by name.
-
-    Query Parameters:
-        - q: Search query (first name or last name)
-
-    Returns:
-        - List of matching students
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: q
+        in: query
+        type: string
+        required: true
+        minLength: 2
+        description: Search query (first name or last name)
+    responses:
+      200:
+        description: List of matching students
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              first_name:
+                type: string
+              last_name:
+                type: string
+              course:
+                type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     query = request.args.get('q', '')
 
@@ -96,12 +170,46 @@ def search_students():
 @require_professor
 def get_student(student_id: UUID):
     """Get student by ID.
-
-    Args:
-        student_id: Student ID
-
-    Returns:
-        - Student information
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+        description: Student UUID
+    responses:
+      200:
+        description: Student information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            first_name:
+              type: string
+            last_name:
+              type: string
+            course:
+              type: string
+            address:
+              type: string
+            phone:
+              type: string
+            enrollment_date:
+              type: string
+              format: date
+            is_active:
+              type: boolean
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     try:
         student = student_service.get_student(student_id)
@@ -118,17 +226,49 @@ def get_student(student_id: UUID):
 @require_professor
 def create_student():
     """Create a new student.
-
-    Request Body:
-        - first_name: First name
-        - last_name: Last name
-        - course: Course type (boxing, kickboxing, both)
-        - address: Optional address
-        - phone: Optional phone
-        - enrollment_date: Optional enrollment date (defaults to today)
-
-    Returns:
-        - Created student information
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - first_name
+            - last_name
+            - course
+          properties:
+            first_name:
+              type: string
+              example: "Juan"
+            last_name:
+              type: string
+              example: "Pérez"
+            course:
+              type: string
+              enum: [boxing, kickboxing, both]
+              example: "boxing"
+            address:
+              type: string
+              example: "Av. Principal 123"
+            phone:
+              type: string
+              example: "+56912345678"
+            enrollment_date:
+              type: string
+              format: date
+              example: "2024-03-20"
+    responses:
+      201:
+        description: Student created successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     data = request.get_json()
 
@@ -162,20 +302,45 @@ def create_student():
 @require_professor
 def update_student(student_id: UUID):
     """Update student.
-
-    Args:
-        student_id: Student ID
-
-    Request Body:
-        - first_name: First name (optional)
-        - last_name: Last name (optional)
-        - address: Address (optional)
-        - phone: Phone (optional)
-        - course: Course type (optional)
-        - is_active: Active status (optional)
-
-    Returns:
-        - Updated student information
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            first_name:
+              type: string
+            last_name:
+              type: string
+            address:
+              type: string
+            phone:
+              type: string
+            course:
+              type: string
+              enum: [boxing, kickboxing, both]
+            is_active:
+              type: boolean
+    responses:
+      200:
+        description: Student updated successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     data = request.get_json()
 
@@ -210,12 +375,30 @@ def update_student(student_id: UUID):
 @require_professor
 def delete_student(student_id: UUID):
     """Delete student.
-
-    Args:
-        student_id: Student ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Student deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Student deleted successfully"
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     try:
         student_service.delete_student(student_id)
@@ -232,12 +415,24 @@ def delete_student(student_id: UUID):
 @require_professor
 def deactivate_student(student_id: UUID):
     """Deactivate a student.
-
-    Args:
-        student_id: Student ID
-
-    Returns:
-        - Updated student information
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Student deactivated
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     try:
         student = student_service.deactivate_student(student_id)
@@ -254,12 +449,24 @@ def deactivate_student(student_id: UUID):
 @require_professor
 def activate_student(student_id: UUID):
     """Activate a student.
-
-    Args:
-        student_id: Student ID
-
-    Returns:
-        - Updated student information
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Student activated
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     try:
         student = student_service.activate_student(student_id)

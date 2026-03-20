@@ -32,6 +32,42 @@ class Config:
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    @classmethod
+    def get_swagger_template(cls) -> dict:
+        """Get Swagger template configuration."""
+        return {
+            'swagger': '2.0',
+            'info': {
+                'title': 'Legión Combat API',
+                'description': 'Sistema de gestión para gimnasio de boxeo - API REST completa',
+                'version': '1.0.0',
+                'contact': {
+                    'name': 'API Support',
+                    'email': 'support@legioncombat.com'
+                },
+            },
+            'host': '',  # Will be auto-detected
+            'basePath': '/',
+            'schemes': ['http', 'https'],
+            'securityDefinitions': {
+                'Bearer': {
+                    'type': 'apiKey',
+                    'name': 'Authorization',
+                    'in': 'header',
+                    'description': 'JWT Authorization header using the Bearer scheme. Example: "Bearer {token}"'
+                }
+            },
+            'tags': [
+                {'name': 'Auth', 'description': 'Autenticación y gestión de tokens'},
+                {'name': 'Users', 'description': 'Gestión de usuarios (Owner only)'},
+                {'name': 'Students', 'description': 'Gestión de estudiantes'},
+                {'name': 'Payments', 'description': 'Sistema de pagos y vencimientos'},
+                {'name': 'Schedules', 'description': 'Templates de horarios (Owner only)'},
+                {'name': 'Classes', 'description': 'Instancias de clases'},
+                {'name': 'Attendance', 'description': 'Control de asistencia'},
+            ]
+        }
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""

@@ -20,6 +20,40 @@ Sistema de gestión para gimnasio de boxeo con API REST completa.
 - Pydantic (validación/serialización)
 - PyJWT + bcrypt
 - pytest (testing)
+- Flasgger (documentación Swagger UI)
+
+## Documentación de API (Swagger UI)
+
+La API incluye documentación interactiva generada automáticamente con **Flasgger**.
+
+### Acceder a la documentación
+
+Una vez iniciada la aplicación:
+
+- **Swagger UI**: `http://localhost:5000/apidocs/`
+- **OpenAPI JSON**: `http://localhost:5000/apispec_1.json`
+
+### Usar Swagger UI
+
+1. **Explorar endpoints**: Navega por las categorías (Auth, Students, Payments, etc.)
+2. **Ver modelos**: Cada endpoint muestra los parámetros esperados y respuestas
+3. **Probar endpoints**:
+   - Haz clic en un endpoint para expandirlo
+   - Click en "Try it out"
+   - Completa los parámetros
+   - Para endpoints protegidos, haz clic en "Authorize" e ingresa: `Bearer <tu_token>`
+   - Click en "Execute"
+
+### Autenticación en Swagger UI
+
+Los endpoints protegidos requieren un JWT token:
+
+1. Primero ejecuta el endpoint `/auth/login` con tus credenciales
+2. Copia el `access_token` de la respuesta
+3. Haz clic en el botón **"Authorize"** (candado arriba a la derecha)
+4. Ingresa: `Bearer eyJhbG...` (tu token completo)
+5. Haz clic en "Authorize" y cierra el modal
+6. Ahora todos los requests incluirán automáticamente el header de autorización
 
 ## Instalación
 
@@ -61,6 +95,29 @@ JWT_SECRET_KEY=your-jwt-secret-key
 
 ## Uso
 
+### Documentación de API (Swagger UI)
+
+La API incluye documentación interactiva generada automáticamente con **Flasgger**.
+
+Una vez iniciada la aplicación:
+
+- **Swagger UI**: [http://localhost:5000/apidocs/](http://localhost:5000/apidocs/)
+- **OpenAPI JSON**: [http://localhost:5000/apispec_1.json](http://localhost:5000/apispec_1.json)
+
+**Características:**
+- Explora todos los endpoints interactivamente
+- Prueba endpoints directamente desde el navegador
+- Ve modelos de datos esperados (request/response)
+- Autenticación JWT integrada
+
+**Cómo usar:**
+1. Ve a `http://localhost:5000/apidocs/`
+2. Primero haz login en el endpoint `/auth/login`
+3. Copia el `access_token` recibido
+4. Haz clic en "Authorize" (botón verde arriba a la derecha)
+5. Escribe: `Bearer <tu_token>`
+6. ¡Prueba cualquier endpoint protegido!
+
 ### Crear usuario Owner inicial
 
 ```python
@@ -83,6 +140,26 @@ with app.app_context():
 ```
 
 ### Autenticación
+
+Puedes probar la API usando **Swagger UI** (recomendado) o curl:
+
+#### Opción 1: Swagger UI (Interactivo)
+
+1. Abre `http://localhost:5000/apidocs/`
+2. Expande el endpoint `POST /auth/login`
+3. Click "Try it out"
+4. Ingresa credenciales en el body:
+   ```json
+   {
+     "email": "owner@gym.com",
+     "password": "securepassword"
+   }
+   ```
+5. Click "Execute"
+6. Copia el `access_token` de la respuesta
+7. Click en "Authorize" e ingresa: `Bearer eyJhbG...` (tu token)
+
+#### Opción 2: Curl
 
 ```bash
 # Login

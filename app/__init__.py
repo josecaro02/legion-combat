@@ -1,5 +1,6 @@
 """Flask application factory."""
 from flask import Flask
+from flasgger import Swagger
 
 from app.config import Config, get_config
 from app.controllers import register_blueprints
@@ -28,6 +29,9 @@ def create_app(config: Config = None) -> Flask:
 
     # Register blueprints
     register_blueprints(app)
+
+    # Initialize Flasgger (Swagger)
+    Swagger(app, template=config.get_swagger_template())
 
     # Register error handlers
     register_error_handlers(app)
