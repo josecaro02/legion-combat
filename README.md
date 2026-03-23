@@ -75,48 +75,49 @@ pip install -r requirements/dev.txt
 cp .env.example .env
 # Editar .env con tus configuraciones
 
-# Crear base de datos PostgreSQL
+# Crear base de datos PostgreSQL (ver sección abajo)
 createdb legion_combat_dev
 
 # Iniciar aplicación
 python run.py
 ```
 
-## Configuración
+### Instalar PostgreSQL en Ubuntu/Debian
 
-Variables de entorno en `.env`:
+Si obtienes el error `createdb: command not found` o similar:
 
+```bash
+# 1. Instalar PostgreSQL
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# 2. Iniciar el servicio
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# 3. Crear usuario y base de datos
+# Reemplaza 'tu_usuario' con tu usuario de Linux ($USER)
+sudo -u postgres psql -c "CREATE USER tu_usuario WITH CREATEDB;"
+sudo -u postgres psql -c "ALTER USER tu_usuario WITH PASSWORD 'postgres';"
+sudo -u postgres psql -c "ALTER USER tu_usuario WITH SUPERUSER;"
+sudo -u postgres psql -c "CREATE DATABASE legion_combat_dev;"
+
+# 4. Verificar instalación
+psql --version
+sudo systemctl status postgresql
 ```
-FLASK_ENV=development
-SECRET_KEY=your-secret-key
-DATABASE_URL=postgresql://user:pass@localhost:5432/legion_combat_dev
-JWT_SECRET_KEY=your-jwt-secret-key
+
+**Nota**: Asegúrate que el usuario de PostgreSQL coincida con tu usuario de Linux para usar `createdb` sin `-U`.
+
+Si prefieres usar el usuario `postgres`:
+```bash
+sudo -u postgres createdb legion_combat_dev
 ```
 
-## Uso
-
-### Documentación de API (Swagger UI)
-
-La API incluye documentación interactiva generada automáticamente con **Flasgger**.
-
-Una vez iniciada la aplicación:
-
-- **Swagger UI**: [http://localhost:5000/apidocs/](http://localhost:5000/apidocs/)
-- **OpenAPI JSON**: [http://localhost:5000/apispec_1.json](http://localhost:5000/apispec_1.json)
-
-**Características:**
-- Explora todos los endpoints interactivamente
-- Prueba endpoints directamente desde el navegador
-- Ve modelos de datos esperados (request/response)
-- Autenticación JWT integrada
-
-**Cómo usar:**
-1. Ve a `http://localhost:5000/apidocs/`
-2. Primero haz login en el endpoint `/auth/login`
-3. Copia el `access_token` recibido
-4. Haz clic en "Authorize" (botón verde arriba a la derecha)
-5. Escribe: `Bearer <tu_token>`
-6. ¡Prueba cualquier endpoint protegido!
+Y actualiza tu `.env`:
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/legion_combat_dev
+```
 
 ### Crear usuario Owner inicial
 
