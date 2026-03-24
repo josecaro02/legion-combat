@@ -5,10 +5,11 @@
 1. [Visión General de la Arquitectura](#visión-general-de-la-arquitectura)
 2. [Sistema de Autenticación JWT](#sistema-de-autenticación-jwt)
 3. [Sistema de Horarios Recurrentes](#sistema-de-horarios-recurrentes)
-4. [Decisiones de Diseño](#decisiones-de-diseño)
-5. [Escalabilidad](#escalabilidad)
-6. [Errores Comunes y Cómo Evitarlos](#errores-comunes-y-cómo-evitarlos)
-7. [Buenas Prácticas Aplicadas](#buenas-prácticas-aplicadas)
+4. [Sistema de Pagos](#sistema-de-pagos)
+5. [Decisiones de Diseño](#decisiones-de-diseño)
+6. [Escalabilidad](#escalabilidad)
+7. [Errores Comunes y Cómo Evitarlos](#errores-comunes-y-cómo-evitarlos)
+8. [Buenas Prácticas Aplicadas](#buenas-prácticas-aplicadas)
 
 ---
 
@@ -235,6 +236,299 @@ def update_template(self, template_id, **changes):
 - Clases pasadas: mantienen referencia al template viejo
 - Clases futuras: se crearán desde el nuevo template
 - Historial completo: preservado
+
+---
+
+## Sistema de Pagos
+
+El sistema de pagos gestiona las mensualidades de los estudiantes, permitiendo registrar pagos pendientes, marcarlos como pagados, y generar reportes de vencimientos y deudores.
+
+### Modelo de Datos
+
+```python
+class Payment:
+    id: UUID                    # Identificador único del pago
+    student_id: UUID            # Referencia al estudiante
+    amount: Decimal             # Monto del pago (ej: 25000.00)
+    status: PaymentStatus       # pending, paid, overdue
+    due_date: date              # Fecha de vencimiento
+    payment_date: date          # Fecha de pago (null si pending)
+    idempotency_key: str        # Clave única para evitar duplicados
+    notes: str                  # Notas opcionales
+    created_at: datetime
+    updated_at: datetime
+```
+
+### Estados de Pago
+
+- **`pending`**: Pago registrado pero no realizado aún
+- **`paid`**: Pago completado exitosamente
+- **`overdue`**: Pago vencido (pasó la fecha de vencimiento sin pagar)
+
+### Endpoints de Pagos
+
+Todos los endpoints de pagos requieren autenticación JWT (`Bearer` token) y rol de Professor o Owner.
+
+#### 1. Listar Pagos
+
+```
+GET /payments/
+```
+
+**Descripción:** Obtiene lista paginada de todos los pagos con filtros opcionales.
+
+**Parámetros de Query:**
+- `page` (int, opcional): Número de página, default: 1
+- `per_page` (int, opcional): Items por página, default: 20
+- `status` (string, opcional): Filtrar por estado (`pending`, `paid`, `overdue`)
+
+**Respuesta 200:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "student_id": "uuid",
+      "amount": "25000.00",
+      "status": "pending",
+      "due_date": "2024-03-20",
+      "payment_date": null,
+      "student_name": "Juan Pérez"
+    }
+  ],
+  "total": 150,
+  "pages": 8,
+  "current_page": 1
+}
+```
+
+**Uso típico:** Panel de administración para ver todos los pagos, filtrar por estado para ver solo pendientes o vencidos.
+
+---
+
+#### 2. Crear Pago
+
+```
+POST /payments/
+```
+
+**Descripción:** Registra un nuevo pago pendiente para un estudiante. Usa idempotencia para evitar duplicados.
+
+**Body:**
+```json
+{
+  "student_id": "123e4567-e89b-12d3-a456-426614174000",
+  "amount": 25000.00,
+  "due_date": "2024-03-20",
+  "idempotency_key": "payment-juan-marzo-2024",
+  "notes": "Mensualidad marzo 2024"
+}
+```
+
+**Campos requeridos:**
+- `student_id`: UUID del estudiante
+- `amount`: Monto numérico positivo
+- `due_date`: Fecha de vencimiento (YYYY-MM-DD)
+- `idempotency_key`: String único (10-64 chars) para prevenir duplicados
+
+**Respuesta 201:** El pago creado con sus datos.
+
+**Respuesta 400:** Si ya existe un pago con la misma `idempotency_key`, retorna el pago existente (comportamiento idempotente).
+
+**Uso típico:** Registrar la mensualidad de un estudiante. El idempotency_key puede ser generado por el frontend como: `"payment-{student_id}-{mes}-{año}"` para evitar crear el mismo pago dos veces si el usuario hace doble clic.
+
+---
+
+#### 3. Ver Pago por ID
+
+```
+GET /payments/{payment_id}
+```
+
+**Descripción:** Obtiene información detallada de un pago específico.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Respuesta 200:** Información completa del pago incluyendo `student_name` (nombre del estudiante).
+
+**Uso típico:** Ver detalles de un pago específico al hacer clic en él desde la lista.
+
+---
+
+#### 4. Actualizar Pago
+
+```
+PUT /payments/{payment_id}
+```
+
+**Descripción:** Actualiza datos de un pago existente.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Body (todos opcionales):**
+```json
+{
+  "amount": 30000.00,
+  "due_date": "2024-03-25",
+  "notes": "Monto actualizado"
+}
+```
+
+**Campos actualizables:**
+- `amount`: Nuevo monto
+- `due_date`: Nueva fecha de vencimiento
+- `notes`: Nuevas notas
+
+**Restricciones:** No se puede actualizar un pago que ya está `paid` (pagado).
+
+**Uso típico:** Corregir errores en un pago pendiente antes de que se concrete.
+
+---
+
+#### 5. Eliminar Pago
+
+```
+DELETE /payments/{payment_id}
+```
+
+**Descripción:** Elimina un pago del sistema.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Restricciones:** Generalmente solo se permite eliminar pagos `pending`, no pagos ya realizados (por integridad contable).
+
+**Uso típico:** Eliminar un pago registrado por error.
+
+---
+
+#### 6. Ver Pagos de un Estudiante
+
+```
+GET /payments/student/{student_id}
+```
+
+**Descripción:** Obtiene todos los pagos de un estudiante específico.
+
+**Parámetros de Path:**
+- `student_id`: UUID del estudiante
+
+**Parámetros de Query:**
+- `page`, `per_page`: Paginación
+- `status` (opcional): Filtrar por estado
+
+**Respuesta 200:** Lista paginada de pagos del estudiante.
+
+**Uso típico:** Ver historial de pagos de un estudiante específico, ver si tiene pagos pendientes.
+
+---
+
+#### 7. Marcar Pago como Pagado
+
+```
+POST /payments/{payment_id}/mark-paid
+```
+
+**Descripción:** Marca un pago pendiente como pagado.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Body (opcional):**
+```json
+{
+  "payment_date": "2024-03-15"
+}
+```
+
+- `payment_date`: Fecha del pago (default: fecha actual)
+
+**Respuesta 200:** El pago actualizado con status `paid` y `payment_date` establecida.
+
+**Respuesta 400:** Si el pago ya está pagado o está vencido (requiere verificación especial).
+
+**Uso típico:** Cuando un estudiante paga su mensualidad, el profesor marca el pago como realizado.
+
+---
+
+#### 8. Próximos Vencimientos
+
+```
+GET /payments/upcoming
+```
+
+**Descripción:** Obtiene pagos que vencen en los próximos N días.
+
+**Parámetros de Query:**
+- `days` (int, opcional): Días hacia adelante a consultar, default: 5
+
+**Respuesta 200:** Lista de pagos con vencimiento próximo.
+
+**Uso típico:** Alertar a los profesores sobre pagos que vencen pronto para que puedan recordar a los estudiantes.
+
+---
+
+#### 9. Pagos Vencidos
+
+```
+GET /payments/overdue
+```
+
+**Descripción:** Obtiene todos los pagos que ya vencieron (pasó la fecha de vencimiento y no están pagados).
+
+**Respuesta 200:** Lista de pagos vencidos con información del estudiante.
+
+**Uso típico:** Generar lista de estudiantes morosos para enviar recordatorios o hacer seguimiento.
+
+---
+
+#### 10. Resumen de Deudores
+
+```
+GET /payments/overdue/summary
+```
+
+**Descripción:** Genera un resumen agregado de deudores, mostrando cuántos pagos debe cada estudiante y el monto total.
+
+**Respuesta 200:**
+```json
+[
+  {
+    "student_id": "uuid",
+    "student_name": "Juan Pérez",
+    "overdue_count": 2,
+    "total_amount": "50000.00"
+  },
+  {
+    "student_id": "uuid",
+    "student_name": "María García",
+    "overdue_count": 1,
+    "total_amount": "25000.00"
+  }
+]
+```
+
+**Uso típico:** Reporte de morosidad para la administración, mostrando quiénes deben más y cuánto.
+
+### Flujo Típico de Trabajo
+
+1. **Registro inicial:** Se crean pagos mensuales para cada estudiante al inicio del mes usando `POST /payments/`
+2. **Consulta diaria:** Se revisan pagos próximos a vencer con `GET /payments/upcoming`
+3. **Cobro:** Cuando un estudiante paga, se marca como pagado con `POST /payments/{id}/mark-paid`
+4. **Seguimiento:** Se revisan pagos vencidos con `GET /payments/overdue`
+5. **Reportes:** Se genera resumen de deudores con `GET /payments/overdue/summary`
+
+### Idempotencia
+
+El sistema implementa idempotencia mediante la clave `idempotency_key`. Esto significa que si haces la misma petición dos veces con la misma clave, solo se creará un pago (la segunda vez retorna el existente). Esto previene duplicados por errores de red o doble clic.
+
+**Cómo generar la clave:**
+```python
+idempotency_key = f"payment-{student_id}-{mes}-{año}"
+# Ejemplo: "payment-123e4567-...-03-2024"
+```
 
 ---
 
