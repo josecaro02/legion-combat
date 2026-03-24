@@ -22,16 +22,57 @@ attendance_service = AttendanceService()
 @require_professor
 def list_attendance():
     """List attendance records.
-
-    Query Parameters:
-        - class_instance_id: Filter by class instance
-        - student_id: Filter by student
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 50)
-
-    Returns:
-        - items: List of attendance records
-        - total: Total count
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: class_instance_id
+        in: query
+        type: string
+        format: uuid
+        description: Filter by class instance
+      - name: student_id
+        in: query
+        type: string
+        format: uuid
+        description: Filter by student
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 50
+    responses:
+      200:
+        description: List of attendance records
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  class_instance_id:
+                    type: string
+                  student_id:
+                    type: string
+                  attended_at:
+                    type: string
+                    format: date-time
+            total:
+              type: integer
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     class_instance_id = request.args.get('class_instance_id')
     student_id = request.args.get('student_id')
@@ -78,13 +119,51 @@ def list_attendance():
 @require_professor
 def register_attendance():
     """Register attendance for students.
-
-    Request Body:
-        - class_instance_id: Class instance ID
-        - student_ids: List of student IDs
-
-    Returns:
-        - List of created attendance records
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - class_instance_id
+            - student_ids
+          properties:
+            class_instance_id:
+              type: string
+              format: uuid
+              description: Class instance ID
+            student_ids:
+              type: array
+              items:
+                type: string
+                format: uuid
+              description: List of student IDs
+    responses:
+      201:
+        description: Attendance registered successfully
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              class_instance_id:
+                type: string
+              student_id:
+                type: string
+              attended_at:
+                type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     data = request.get_json()
 
@@ -114,13 +193,42 @@ def register_attendance():
 @require_professor
 def remove_attendance():
     """Remove attendance for a student.
-
-    Request Body:
-        - class_instance_id: Class instance ID
-        - student_id: Student ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - class_instance_id
+            - student_id
+          properties:
+            class_instance_id:
+              type: string
+              format: uuid
+            student_id:
+              type: string
+              format: uuid
+    responses:
+      200:
+        description: Attendance removed successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Attendance removed successfully"
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Attendance record not found
     """
     data = request.get_json()
 
@@ -150,12 +258,37 @@ def remove_attendance():
 @require_professor
 def get_daily_attendance(date_str: str):
     """Get daily attendance summary.
-
-    Args:
-        date_str: Date in YYYY-MM-DD format
-
-    Returns:
-        - List of class summaries with attendance counts
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: date_str
+        in: path
+        type: string
+        required: true
+        description: Date in YYYY-MM-DD format
+    responses:
+      200:
+        description: Daily attendance summary
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              class_id:
+                type: string
+              class_time:
+                type: string
+              course_type:
+                type: string
+              attendance_count:
+                type: integer
+      400:
+        description: Invalid date format
+      401:
+        description: Unauthorized
     """
     try:
         target_date = date.fromisoformat(date_str)
@@ -180,20 +313,58 @@ def get_daily_attendance(date_str: str):
 @require_professor
 def get_student_attendance(student_id: UUID):
     """Get attendance history for a student.
-
-    Args:
-        student_id: Student ID
-
-    Query Parameters:
-        - months: Number of months to look back (1, 2, or 3, default: 1)
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 50)
-
-    Returns:
-        - items: List of attendance records
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: months
+        in: query
+        type: integer
+        default: 1
+        enum: [1, 2, 3]
+        description: Number of months to look back
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 50
+    responses:
+      200:
+        description: Student attendance history
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  class_instance_id:
+                    type: string
+                  attended_at:
+                    type: string
+            total:
+              type: integer
+            pages:
+              type: integer
+            current_page:
+              type: integer
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     months = request.args.get('months', 1, type=int)
     page = request.args.get('page', 1, type=int)
@@ -224,15 +395,40 @@ def get_student_attendance(student_id: UUID):
 @require_professor
 def get_student_attendance_stats(student_id: UUID):
     """Get attendance statistics for a student.
-
-    Args:
-        student_id: Student ID
-
-    Query Parameters:
-        - months: Number of months to analyze (1, 2, or 3, default: 1)
-
-    Returns:
-        - Attendance statistics
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: months
+        in: query
+        type: integer
+        default: 1
+        enum: [1, 2, 3]
+        description: Number of months to analyze
+    responses:
+      200:
+        description: Attendance statistics
+        schema:
+          type: object
+          properties:
+            total_classes:
+              type: integer
+            attended_classes:
+              type: integer
+            attendance_rate:
+              type: number
+              description: Percentage (0-100)
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     months = request.args.get('months', 1, type=int)
 
@@ -254,12 +450,29 @@ def get_student_attendance_stats(student_id: UUID):
 @require_professor
 def get_class_attendance_count(class_instance_id: UUID):
     """Get attendance count for a class.
-
-    Args:
-        class_instance_id: Class instance ID
-
-    Returns:
-        - count: Number of attendances
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: class_instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Attendance count
+        schema:
+          type: object
+          properties:
+            count:
+              type: integer
+      401:
+        description: Unauthorized
+      404:
+        description: Class not found
     """
     try:
         count = attendance_service.get_class_attendance_count(class_instance_id)
@@ -276,12 +489,35 @@ def get_class_attendance_count(class_instance_id: UUID):
 @require_professor
 def get_class_attending_students(class_instance_id: UUID):
     """Get list of students attending a class.
-
-    Args:
-        class_instance_id: Class instance ID
-
-    Returns:
-        - items: List of attending students
+    ---
+    tags:
+      - Attendance
+    security:
+      - Bearer: []
+    parameters:
+      - name: class_instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: List of attending students
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              student_id:
+                type: string
+              attended_at:
+                type: string
+      401:
+        description: Unauthorized
+      404:
+        description: Class not found
     """
     try:
         attendances = attendance_service.get_class_attendances(class_instance_id)

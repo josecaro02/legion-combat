@@ -20,6 +20,40 @@ Sistema de gestión para gimnasio de boxeo con API REST completa.
 - Pydantic (validación/serialización)
 - PyJWT + bcrypt
 - pytest (testing)
+- Flasgger (documentación Swagger UI)
+
+## Documentación de API (Swagger UI)
+
+La API incluye documentación interactiva generada automáticamente con **Flasgger**.
+
+### Acceder a la documentación
+
+Una vez iniciada la aplicación:
+
+- **Swagger UI**: `http://localhost:5000/apidocs/`
+- **OpenAPI JSON**: `http://localhost:5000/apispec_1.json`
+
+### Usar Swagger UI
+
+1. **Explorar endpoints**: Navega por las categorías (Auth, Students, Payments, etc.)
+2. **Ver modelos**: Cada endpoint muestra los parámetros esperados y respuestas
+3. **Probar endpoints**:
+   - Haz clic en un endpoint para expandirlo
+   - Click en "Try it out"
+   - Completa los parámetros
+   - Para endpoints protegidos, haz clic en "Authorize" e ingresa: `Bearer <tu_token>`
+   - Click en "Execute"
+
+### Autenticación en Swagger UI
+
+Los endpoints protegidos requieren un JWT token:
+
+1. Primero ejecuta el endpoint `/auth/login` con tus credenciales
+2. Copia el `access_token` de la respuesta
+3. Haz clic en el botón **"Authorize"** (candado arriba a la derecha)
+4. Ingresa: `Bearer eyJhbG...` (tu token completo)
+5. Haz clic en "Authorize" y cierra el modal
+6. Ahora todos los requests incluirán automáticamente el header de autorización
 
 ## Instalación
 
@@ -41,25 +75,49 @@ pip install -r requirements/dev.txt
 cp .env.example .env
 # Editar .env con tus configuraciones
 
-# Crear base de datos PostgreSQL
+# Crear base de datos PostgreSQL (ver sección abajo)
 createdb legion_combat_dev
 
 # Iniciar aplicación
 python run.py
 ```
 
-## Configuración
+### Instalar PostgreSQL en Ubuntu/Debian
 
-Variables de entorno en `.env`:
+Si obtienes el error `createdb: command not found` o similar:
 
+```bash
+# 1. Instalar PostgreSQL
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# 2. Iniciar el servicio
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# 3. Crear usuario y base de datos
+# Reemplaza 'tu_usuario' con tu usuario de Linux ($USER)
+sudo -u postgres psql -c "CREATE USER tu_usuario WITH CREATEDB;"
+sudo -u postgres psql -c "ALTER USER tu_usuario WITH PASSWORD 'postgres';"
+sudo -u postgres psql -c "ALTER USER tu_usuario WITH SUPERUSER;"
+sudo -u postgres psql -c "CREATE DATABASE legion_combat_dev;"
+
+# 4. Verificar instalación
+psql --version
+sudo systemctl status postgresql
 ```
-FLASK_ENV=development
-SECRET_KEY=your-secret-key
-DATABASE_URL=postgresql://user:pass@localhost:5432/legion_combat_dev
-JWT_SECRET_KEY=your-jwt-secret-key
+
+**Nota**: Asegúrate que el usuario de PostgreSQL coincida con tu usuario de Linux para usar `createdb` sin `-U`.
+
+Si prefieres usar el usuario `postgres`:
+```bash
+sudo -u postgres createdb legion_combat_dev
 ```
 
-## Uso
+Y actualiza tu `.env`:
+```
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/legion_combat_dev
+```
 
 ### Crear usuario Owner inicial
 
@@ -83,6 +141,26 @@ with app.app_context():
 ```
 
 ### Autenticación
+
+Puedes probar la API usando **Swagger UI** (recomendado) o curl:
+
+#### Opción 1: Swagger UI (Interactivo)
+
+1. Abre `http://localhost:5000/apidocs/`
+2. Expande el endpoint `POST /auth/login`
+3. Click "Try it out"
+4. Ingresa credenciales en el body:
+   ```json
+   {
+     "email": "owner@gym.com",
+     "password": "securepassword"
+   }
+   ```
+5. Click "Execute"
+6. Copia el `access_token` de la respuesta
+7. Click en "Authorize" e ingresa: `Bearer eyJhbG...` (tu token)
+
+#### Opción 2: Curl
 
 ```bash
 # Login

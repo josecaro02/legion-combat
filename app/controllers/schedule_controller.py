@@ -22,14 +22,53 @@ schedule_service = ScheduleService()
 @require_professor
 def list_templates():
     """List schedule templates.
-
-    Query Parameters:
-        - course_type: Filter by course type (optional)
-        - is_active: Filter by active status (optional)
-
-    Returns:
-        - items: List of templates
-        - total: Total count
+    ---
+    tags:
+      - Schedules
+    security:
+      - Bearer: []
+    parameters:
+      - name: course_type
+        in: query
+        type: string
+        enum: [boxing, kickboxing, both]
+        description: Filter by course type
+      - name: is_active
+        in: query
+        type: boolean
+        description: Filter by active status
+    responses:
+      200:
+        description: List of schedule templates
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  day_of_week:
+                    type: integer
+                    description: 0=Monday, 6=Sunday
+                  start_time:
+                    type: string
+                    example: "18:00:00"
+                  end_time:
+                    type: string
+                  course_type:
+                    type: string
+                  max_capacity:
+                    type: integer
+                  is_active:
+                    type: boolean
+            total:
+              type: integer
+      401:
+        description: Unauthorized
     """
     course_type = request.args.get('course_type')
     is_active = request.args.get('is_active')
@@ -58,18 +97,56 @@ def list_templates():
 @require_owner
 def create_template():
     """Create a new schedule template (owner only).
-
-    Request Body:
-        - day_of_week: Day of week (0-6, Monday-Sunday)
-        - start_time: Start time (HH:MM:SS)
-        - end_time: End time (HH:MM:SS)
-        - course_type: Course type (boxing, kickboxing, both)
-        - max_capacity: Maximum capacity (default: 20)
-        - valid_from: Valid from date (YYYY-MM-DD)
-        - professor_id: Professor ID
-
-    Returns:
-        - Created template information
+    ---
+    tags:
+      - Schedules
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - day_of_week
+            - start_time
+            - end_time
+            - course_type
+            - professor_id
+          properties:
+            day_of_week:
+              type: integer
+              description: 0=Monday, 6=Sunday
+              example: 0
+            start_time:
+              type: string
+              description: HH:MM:SS
+              example: "18:00:00"
+            end_time:
+              type: string
+              example: "19:00:00"
+            course_type:
+              type: string
+              enum: [boxing, kickboxing, both]
+            max_capacity:
+              type: integer
+              default: 20
+            valid_from:
+              type: string
+              format: date
+            professor_id:
+              type: string
+              format: uuid
+    responses:
+      201:
+        description: Template created successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
     """
     data = request.get_json()
 
@@ -105,12 +182,41 @@ def create_template():
 @require_professor
 def get_template(template_id: UUID):
     """Get schedule template by ID.
-
-    Args:
-        template_id: Template ID
-
-    Returns:
-        - Template information
+    ---
+    tags:
+      - Schedules
+    security:
+      - Bearer: []
+    parameters:
+      - name: template_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Template information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            day_of_week:
+              type: integer
+            start_time:
+              type: string
+            end_time:
+              type: string
+            course_type:
+              type: string
+            max_capacity:
+              type: integer
+            is_active:
+              type: boolean
+      401:
+        description: Unauthorized
+      404:
+        description: Template not found
     """
     try:
         template = schedule_service.get_template(template_id)
@@ -127,20 +233,46 @@ def get_template(template_id: UUID):
 @require_owner
 def update_template(template_id: UUID):
     """Update schedule template (owner only).
-
-    Args:
-        template_id: Template ID
-
-    Request Body:
-        - day_of_week: New day of week (optional)
-        - start_time: New start time (optional)
-        - end_time: New end time (optional)
-        - course_type: New course type (optional)
-        - max_capacity: New max capacity (optional)
-        - is_active: New active status (optional)
-
-    Returns:
-        - Updated template information
+    ---
+    tags:
+      - Schedules
+    security:
+      - Bearer: []
+    parameters:
+      - name: template_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            day_of_week:
+              type: integer
+            start_time:
+              type: string
+            end_time:
+              type: string
+            course_type:
+              type: string
+            max_capacity:
+              type: integer
+            is_active:
+              type: boolean
+    responses:
+      200:
+        description: Template updated successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Template not found
     """
     data = request.get_json()
 
@@ -183,12 +315,32 @@ def update_template(template_id: UUID):
 @require_owner
 def delete_template(template_id: UUID):
     """Delete schedule template (owner only - soft delete).
-
-    Args:
-        template_id: Template ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Schedules
+    security:
+      - Bearer: []
+    parameters:
+      - name: template_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Template deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Template deleted successfully"
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Template not found
     """
     try:
         schedule_service.delete_template(template_id)
@@ -205,12 +357,28 @@ def delete_template(template_id: UUID):
 @require_professor
 def get_templates_by_day(day: int):
     """Get templates by day of week.
-
-    Args:
-        day: Day of week (0-6, Monday-Sunday)
-
-    Returns:
-        - List of templates
+    ---
+    tags:
+      - Schedules
+    security:
+      - Bearer: []
+    parameters:
+      - name: day
+        in: path
+        type: integer
+        required: true
+        description: Day of week (0=Monday, 6=Sunday)
+    responses:
+      200:
+        description: List of templates for the day
+        schema:
+          type: array
+          items:
+            type: object
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     try:
         templates = schedule_service.get_templates_by_day(day)

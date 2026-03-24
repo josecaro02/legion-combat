@@ -18,16 +18,61 @@ user_service = UserService()
 @require_owner
 def create_professor():
     """Create a new professor (owner only).
-
-    Request Body:
-        - email: Professor email
-        - password: Professor password (min 8 chars)
-        - first_name: First name
-        - last_name: Last name
-        - role: Must be 'professor'
-
-    Returns:
-        - Created professor information
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - password
+            - first_name
+            - last_name
+          properties:
+            email:
+              type: string
+              format: email
+              example: "professor@gym.com"
+            password:
+              type: string
+              minLength: 8
+              example: "securepassword"
+            first_name:
+              type: string
+              example: "Juan"
+            last_name:
+              type: string
+              example: "Pérez"
+    responses:
+      201:
+        description: Professor created successfully
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            first_name:
+              type: string
+            last_name:
+              type: string
+            role:
+              type: string
+              example: "professor"
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden - Owner access required
     """
     data = request.get_json()
 
@@ -67,16 +112,56 @@ def create_professor():
 @require_owner
 def list_professors():
     """List all professors (owner only).
-
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-
-    Returns:
-        - items: List of professors
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: Page number
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+        description: Items per page
+    responses:
+      200:
+        description: List of professors
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  email:
+                    type: string
+                  first_name:
+                    type: string
+                  last_name:
+                    type: string
+                  role:
+                    type: string
+                  is_active:
+                    type: boolean
+            total:
+              type: integer
+            pages:
+              type: integer
+            current_page:
+              type: integer
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -105,12 +190,43 @@ def list_professors():
 @require_owner
 def get_professor(user_id: UUID):
     """Get professor by ID (owner only).
-
-    Args:
-        user_id: Professor ID
-
-    Returns:
-        - Professor information
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+        description: Professor UUID
+    responses:
+      200:
+        description: Professor information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            first_name:
+              type: string
+            last_name:
+              type: string
+            role:
+              type: string
+            is_active:
+              type: boolean
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Professor not found
     """
     try:
         user = user_service.get_user(user_id)
@@ -132,17 +248,40 @@ def get_professor(user_id: UUID):
 @require_owner
 def update_professor(user_id: UUID):
     """Update professor (owner only).
-
-    Args:
-        user_id: Professor ID
-
-    Request Body:
-        - first_name: First name (optional)
-        - last_name: Last name (optional)
-        - is_active: Active status (optional)
-
-    Returns:
-        - Updated professor information
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            first_name:
+              type: string
+            last_name:
+              type: string
+            is_active:
+              type: boolean
+    responses:
+      200:
+        description: Professor updated successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Professor not found
     """
     data = request.get_json()
 
@@ -174,12 +313,32 @@ def update_professor(user_id: UUID):
 @require_owner
 def delete_professor(user_id: UUID):
     """Delete professor (owner only).
-
-    Args:
-        user_id: Professor ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Professor deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Professor deleted successfully"
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Professor not found
     """
     try:
         user = user_service.get_user(user_id)
@@ -203,15 +362,46 @@ def delete_professor(user_id: UUID):
 @require_owner
 def reset_user_password(user_id: UUID):
     """Reset user password (owner only).
-
-    Args:
-        user_id: User ID
-
-    Request Body:
-        - new_password: New password (min 8 chars)
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Users
+    security:
+      - Bearer: []
+    parameters:
+      - name: user_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - new_password
+          properties:
+            new_password:
+              type: string
+              minLength: 8
+              description: New password (min 8 characters)
+    responses:
+      200:
+        description: Password reset successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Password reset successfully"
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: User not found
     """
     data = request.get_json()
     new_password = data.get('new_password')

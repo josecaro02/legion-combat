@@ -17,17 +17,61 @@ payment_service = PaymentService()
 @require_professor
 def list_payments():
     """List payments with optional filters.
-
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-        - status: Filter by status (pending, paid, overdue)
-
-    Returns:
-        - items: List of payments
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: Page number
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+        description: Items per page
+      - name: status
+        in: query
+        type: string
+        enum: [pending, paid, overdue]
+        description: Filter by payment status
+    responses:
+      200:
+        description: List of payments
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  student_id:
+                    type: string
+                    format: uuid
+                  amount:
+                    type: string
+                    example: "25000.00"
+                  status:
+                    type: string
+                    enum: [pending, paid, overdue]
+                  due_date:
+                    type: string
+                    format: date
+            total:
+              type: integer
+            pages:
+              type: integer
+            current_page:
+              type: integer
+      401:
+        description: Unauthorized
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -57,16 +101,51 @@ def list_payments():
 @require_professor
 def create_payment():
     """Create a new payment.
-
-    Request Body:
-        - student_id: Student ID
-        - amount: Payment amount
-        - due_date: Due date (YYYY-MM-DD)
-        - idempotency_key: Unique key for idempotency (10-64 chars)
-        - notes: Optional notes
-
-    Returns:
-        - Created payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - student_id
+            - amount
+            - due_date
+            - idempotency_key
+          properties:
+            student_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            amount:
+              type: number
+              format: decimal
+              description: Payment amount (positive number)
+              example: 25000.00
+            due_date:
+              type: string
+              format: date
+              example: "2024-03-20"
+            idempotency_key:
+              type: string
+              minLength: 10
+              maxLength: 64
+              description: Unique key to prevent duplicate payments
+            notes:
+              type: string
+              description: Optional notes
+    responses:
+      201:
+        description: Payment created successfully
+      400:
+        description: Validation error or duplicate payment
+      401:
+        description: Unauthorized
     """
     data = request.get_json()
 
@@ -99,12 +178,41 @@ def create_payment():
 @require_professor
 def get_payment(payment_id: UUID):
     """Get payment by ID.
-
-    Args:
-        payment_id: Payment ID
-
-    Returns:
-        - Payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Payment information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            student_id:
+              type: string
+            amount:
+              type: string
+            status:
+              type: string
+            due_date:
+              type: string
+            payment_date:
+              type: string
+            student_name:
+              type: string
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     try:
         payment = payment_service.get_payment_with_student(payment_id)
@@ -124,17 +232,40 @@ def get_payment(payment_id: UUID):
 @require_professor
 def update_payment(payment_id: UUID):
     """Update payment.
-
-    Args:
-        payment_id: Payment ID
-
-    Request Body:
-        - amount: New amount (optional)
-        - due_date: New due date (optional)
-        - notes: New notes (optional)
-
-    Returns:
-        - Updated payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            amount:
+              type: number
+              description: New amount
+            due_date:
+              type: string
+              format: date
+            notes:
+              type: string
+    responses:
+      200:
+        description: Payment updated successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     data = request.get_json()
 
@@ -166,12 +297,30 @@ def update_payment(payment_id: UUID):
 @require_professor
 def delete_payment(payment_id: UUID):
     """Delete payment.
-
-    Args:
-        payment_id: Payment ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Payment deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Payment deleted successfully"
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     try:
         payment_service.delete_payment(payment_id)
@@ -188,20 +337,36 @@ def delete_payment(payment_id: UUID):
 @require_professor
 def get_student_payments(student_id: UUID):
     """Get payments for a student.
-
-    Args:
-        student_id: Student ID
-
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-        - status: Filter by status
-
-    Returns:
-        - items: List of payments
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+      - name: status
+        in: query
+        type: string
+        enum: [pending, paid, overdue]
+    responses:
+      200:
+        description: List of payments for student
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -232,15 +397,46 @@ def get_student_payments(student_id: UUID):
 @require_professor
 def mark_payment_paid(payment_id: UUID):
     """Mark payment as paid.
-
-    Args:
-        payment_id: Payment ID
-
-    Request Body:
-        - payment_date: Optional payment date (defaults to today)
-
-    Returns:
-        - Updated payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: false
+        schema:
+          type: object
+          properties:
+            payment_date:
+              type: string
+              format: date
+              description: Optional payment date (defaults to today)
+    responses:
+      200:
+        description: Payment marked as paid
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              example: "paid"
+            payment_date:
+              type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     data = request.get_json() or {}
     payment_date = data.get('payment_date')
@@ -264,12 +460,26 @@ def mark_payment_paid(payment_id: UUID):
 @require_professor
 def get_upcoming_payments():
     """Get upcoming payments due in next N days.
-
-    Query Parameters:
-        - days: Number of days to look ahead (default: 5)
-
-    Returns:
-        - List of upcoming payments
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: days
+        in: query
+        type: integer
+        default: 5
+        description: Number of days to look ahead
+    responses:
+      200:
+        description: List of upcoming payments
+        schema:
+          type: array
+          items:
+            type: object
+      401:
+        description: Unauthorized
     """
     days = request.args.get('days', 5, type=int)
 
@@ -288,9 +498,29 @@ def get_upcoming_payments():
 @require_professor
 def get_overdue_payments():
     """Get overdue payments.
-
-    Returns:
-        - List of overdue payments with student info
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: List of overdue payments
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              student_name:
+                type: string
+              amount:
+                type: string
+              due_date:
+                type: string
+      401:
+        description: Unauthorized
     """
     try:
         payments = payment_service.get_overdue_payments()
@@ -307,9 +537,29 @@ def get_overdue_payments():
 @require_professor
 def get_overdue_summary():
     """Get summary of overdue payments by student.
-
-    Returns:
-        - List of student summaries with overdue counts and totals
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: Summary of debtors
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              student_name:
+                type: string
+              overdue_count:
+                type: integer
+              total_amount:
+                type: string
+      401:
+        description: Unauthorized
     """
     try:
         summary = payment_service.get_overdue_summary()
