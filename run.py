@@ -10,9 +10,11 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from app import create_app
 from app.config import get_config
 
+
 # Create application with appropriate configuration
 config = get_config()
 app = create_app(config)
+
 
 if __name__ == '__main__':
     app.run(
