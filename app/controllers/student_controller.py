@@ -476,3 +476,101 @@ def activate_student(student_id: UUID):
             'error': 'NOT_FOUND',
             'message': str(e)
         }), 404
+
+
+@student_bp.route('/upcoming-payments', methods=['GET'])
+@jwt_required
+@require_professor
+def get_students_with_upcoming_payment_due():
+    """Get students whose last payment is approaching one month anniversary.
+
+    Returns active students whose last paid payment_date + 1 month
+    falls within the specified window from today. Useful for sending
+    payment reminders before the next month is due.
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: days
+        in: query
+        type: integer
+        default: 5
+        minimum: 1
+        maximum: 30
+        description: Number of days to look ahead for payments approaching one month
+    responses:
+      200:
+        description: List of students with upcoming payment due dates
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  student:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      first_name:
+                        type: string
+                      last_name:
+                        type: string
+                      phone:
+                        type: string
+                      course:
+                        type: string
+                  last_payment_date:
+                    type: string
+                    format: date
+                    description: Date of the last payment made
+                  due_soon_date:
+                    type: string
+                    format: date
+                    description: Date when one month from last payment is reached (payment_date + 1 month)
+            total:
+              type: integer
+              description: Total number of students found
+      400:
+        description: Invalid days parameter
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden - Professor access required
+    """
+    days = request.args.get('days', 5, type=int)
+
+    # Validate days parameter
+    if days < 1 or days > 30:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'days parameter must be between 1 and 30'
+        }), 400
+    
+    try:
+        results = student_service.get_students_with_upcoming_payment_due(days=days)
+
+        # Build response
+        items = []
+        for result in results:
+            student = result['student']
+            items.append({
+                'student': StudentResponse.model_validate(student).model_dump(),
+                'last_payment_date': result['last_payment_date'].isoformat(),
+                'due_soon_date': result['due_soon_date'].isoformat()
+            })
+
+        return jsonify({
+            'items': items,
+            'total': len(items)
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'error': 'INTERNAL_ERROR',
+            'message': str(e)
+        }), 500

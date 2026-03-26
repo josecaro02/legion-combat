@@ -49,6 +49,9 @@ def create_professor():
             last_name:
               type: string
               example: "Pérez"
+            role:
+              type: string
+              example: "professor"
     responses:
       201:
         description: Professor created successfully
