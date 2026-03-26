@@ -974,6 +974,152 @@ def create_student():
 
 ---
 
+## Nuevo Endpoint: Recordatorios de Pagos Próximos a Vencer
+
+### Propósito
+
+El endpoint `GET /students/upcoming-payments` permite identificar estudiantes cuyo último pago realizado está próximo a cumplir un mes. Esto es útil para enviar recordatorios de renovación de mensualidad antes de que el mes se complete.
+
+### Lógica del Endpoint
+
+1. **Filtrar estudiantes activos**: Solo considera estudiantes con `is_active = True`
+2. **Encontrar último pago por estudiante**: Obtiene el pago más reciente con `status = "paid"` y `payment_date != NULL`
+3. **Calcular fecha objetivo**: `due_soon_date = payment_date + 1 mes`
+4. **Filtrar por rango**: Incluye solo si `hoy <= due_soon_date <= hoy + days`
+5. **Ordenar**: Por fecha de vencimiento más próxima
+
+### Ejemplo de Uso
+
+```
+GET /students/upcoming-payments?days=5
+```
+
+**Respuesta:**
+```json
+{
+  "items": [
+    {
+      "student": {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "first_name": "Juan",
+        "last_name": "Pérez",
+        "phone": "+56912345678",
+        "course": "boxing"
+      },
+      "last_payment_date": "2024-02-20",
+      "due_soon_date": "2024-03-20"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Implementación SQLAlchemy: Evitando N+1 Queries
+
+La clave de esta implementación es usar una **subconsulta** para obtener el último pago de cada estudiante en una sola query a la base de datos:
+
+```python
+# Subquery: Obtiene la fecha máxima de pago por estudiante
+latest_payment_subq = (
+    select(
+        Payment.student_id.label('student_id'),
+        func.max(Payment.payment_date).label('max_payment_date')
+    )
+    .where(
+        Payment.status == PaymentStatus.PAID,
+        Payment.payment_date.isnot(None)
+    )
+    .group_by(Payment.student_id)
+    .subquery()  # <-- Se convierte en subquery
+)
+
+# Main query: Hace JOIN con Student y Payment
+stmt = (
+    select(Student, Payment.payment_date)
+    .join(latest_payment_subq, Student.id == latest_payment_subq.c.student_id)
+    .join(Payment, and_(
+        Payment.student_id == latest_payment_subq.c.student_id,
+        Payment.payment_date == latest_payment_subq.c.max_payment_date
+    ))
+    .where(Student.is_active == True)
+)
+```
+
+**¿Por qué usar subquery?**
+
+Sin subquery, tendríamos que:
+1. Obtener todos los estudiantes activos (1 query)
+2. Para cada estudiante, consultar su último pago (N queries)
+
+**Total: N+1 queries** ❌
+
+Con subquery:
+1. Una sola query que obtiene estudiantes + último pago
+
+**Total: 1 query** ✅
+
+### Cálculo del "Mes" con PostgreSQL
+
+Para calcular `payment_date + 1 mes` usamos la función nativa de PostgreSQL:
+
+```sql
+payment_date + INTERVAL '1 month'
+```
+
+En SQLAlchemy:
+```python
+from sqlalchemy import text
+
+.where(
+    text("(payment_date + INTERVAL '1 month') >= :today"),
+    text("(payment_date + INTERVAL '1 month') <= :target_max")
+)
+```
+
+**Nota sobre el cálculo de meses:**
+- `INTERVAL '1 month'` en PostgreSQL maneja automáticamente los meses de diferente duración
+- Enero 31 + 1 mes = Febrero 28/29 (según año bisiesto)
+- Febrero 28 + 1 mes = Marzo 28
+- Febrero 29 (bisiesto) + 1 mes = Marzo 29
+
+### Manejo de Fechas Límite en Python
+
+Para mostrar la fecha calculada en la respuesta, implementamos una función auxiliar:
+
+```python
+def _add_months(self, source_date: date, months: int) -> date:
+    """Agrega meses a una fecha, manejando correctamente finales de mes."""
+    import calendar
+
+    year = source_date.year
+    month = source_date.month + months
+
+    # Maneja el rollover de año
+    while month > 12:
+        month -= 12
+        year += 1
+
+    # Maneja días que no existen en el mes destino (ej: 31 -> Feb)
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(source_date.day, last_day)
+
+    return date(year, month, day)
+```
+
+### Seguridad
+
+El endpoint requiere:
+- `@jwt_required`: Token JWT válido
+- `@require_professor`: Rol de profesor o owner
+
+### Parámetros
+
+| Parámetro | Tipo | Default | Descripción |
+|-----------|------|---------|-------------|
+| `days` | int | 5 | Días hacia adelante para buscar pagos próximos a vencer (1-30) |
+
+---
+
 ## Buenas Prácticas Aplicadas
 
 ### 1. Principio de Responsabilidad Única (SRP)

@@ -75,14 +75,13 @@ def list_templates():
 
     if is_active is not None:
         is_active = is_active.lower() == 'true'
-
     try:
         templates = schedule_service.list_templates(
             course_type=course_type,
             is_active=is_active
         )
         return jsonify({
-            'items': [ScheduleTemplateResponse.model_validate(t).model_dump() for t in templates],
+            'items': [ScheduleTemplateResponse.model_validate(t).model_dump(mode="json") for t in templates],
             'total': len(templates)
         }), 200
     except Exception as e:
@@ -169,7 +168,7 @@ def create_template():
             valid_from=template_data.valid_from,
             professor_id=template_data.professor_id
         )
-        return jsonify(ScheduleTemplateResponse.model_validate(template).model_dump()), 201
+        return jsonify(ScheduleTemplateResponse.model_validate(template).model_dump(mode="json")), 201
     except Exception as e:
         return jsonify({
             'error': 'VALIDATION_ERROR',
