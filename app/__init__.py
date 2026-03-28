@@ -1,6 +1,7 @@
 """Flask application factory."""
 from flask import Flask
 from flasgger import Swagger
+from flask_cors import CORS
 
 from app.config import Config, get_config
 from app.controllers import register_blueprints
@@ -23,6 +24,12 @@ def create_app(config: Config = None) -> Flask:
         config = get_config()
 
     app.config.from_object(config)
+    
+    CORS(
+        app,
+        resources={r"/auth/*": {"origins": "http://localhost:5173"}},
+        supports_credentials=True
+    )
 
     # Initialize extensions
     db.init_app(app)
