@@ -264,6 +264,49 @@ tests/
 └── integration/         # Tests de integración
 ```
 
+## Frontend
+
+El frontend está en la carpeta `frontend/` y está construido con React + Vite + Tailwind CSS.
+
+### Requisitos Frontend
+
+- Node.js >= 18
+- Backend corriendo en http://localhost:5000
+
+### Instalación y Ejecución
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+El frontend estará disponible en http://localhost:5173
+
+### Funcionalidades Frontend
+
+- **Login**: Autenticación real con el backend
+- **Rutas Protegidas**: `/dashboard` requiere autenticación
+- **Persistencia**: Token guardado en localStorage
+- **Roles**: Soporta `owner` y `professor`
+
+### Estructura Frontend
+
+```
+frontend/
+├── src/
+│   ├── api/           # Funciones de API (auth.js, client.js)
+│   ├── auth/          # AuthContext.jsx
+│   ├── components/    # Layout, Navbar, ProtectedRoute
+│   ├── hooks/         # Custom hooks
+│   ├── pages/         # Login, Dashboard
+│   ├── router/        # AppRouter.jsx
+│   └── main.jsx       # Entry point
+├── package.json
+├── vite.config.js
+└── tailwind.config.js
+```
+
 ## Licencia
 
 MIT
