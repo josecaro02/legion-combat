@@ -17,7 +17,6 @@ export async function login(email, password) {
   });
 
   const data = await response.json();
-
   if (!response.ok) {
     throw new Error(data.message || data.error || 'Login failed');
   }
@@ -25,9 +24,9 @@ export async function login(email, password) {
   return {
     token: data.access_token,
     user: {
-      id: data.user_id,
-      email: data.email,
-      role: data.role,
+      id: data.user.user_id,
+      email: data.user.email,
+      role: data.user.role,
     },
   };
 }
