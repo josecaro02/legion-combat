@@ -290,6 +290,31 @@ El frontend estará disponible en http://localhost:5173
 - **Persistencia**: Token guardado en localStorage
 - **Roles**: Soporta `owner` y `professor`
 
+### Dashboard Dinámico
+
+El Dashboard muestra contenido diferente según el rol del usuario autenticado:
+
+**Común para ambos roles:**
+- Sección **Estudiantes**: Ver lista de estudiantes
+
+**Owner ve:**
+- Sección **Pagos**: Ver pagos pendientes y vencidos
+- Botón **Generar Reporte**
+
+**Professor ve:**
+- Sección **Pagos**: Botón para registrar nuevo pago
+
+**Implementación:**
+```jsx
+const { user } = useAuth();
+const isOwner = user?.role === 'owner';
+const isProfessor = user?.role === 'professor';
+
+// Render condicional basado en rol
+{isOwner && <PaymentsSection />}
+{isProfessor && <RegisterPaymentButton />}
+```
+
 ### Estructura Frontend
 
 ```

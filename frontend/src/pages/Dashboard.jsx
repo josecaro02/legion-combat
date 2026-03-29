@@ -1,69 +1,100 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { authGet } from '../api/client';
 
+/**
+ * Dashboard - Main view after login
+ *
+ * Shows different sections based on user role:
+ * - owner: sees Students and Payments sections
+ * - professor: sees Students and Register Payment sections
+ *
+ * Future: Connect to backend for real data
+ */
 function Dashboard() {
-  const { user, token } = useAuth();
-  const [data, setData] = useState({ students: 0, payments: 0, attendances: 0 });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { user } = useAuth();
+  const role = user?.role;
 
-  useEffect(() => {
-    // Example: fetch dashboard data with auth token
-    async function fetchData() {
-      setLoading(true);
-      try {
-        // Example authenticated request
-        // const result = await authGet('/students/', token);
-        // setData(result);
-
-        // Simulated data for now
-        setData({ students: 45, payments: 12, attendances: 38 });
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [token]);
+  const isOwner = role === 'owner';
+  const isProfessor = role === 'professor';
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold text-gray-800">Dashboard</h1>
+      <h1 className="mb-2 text-2xl font-bold text-gray-800">Dashboard</h1>
 
       <p className="mb-6 text-gray-600">
-        Bienvenido, <span className="font-semibold">{user?.email}</span>.
-        Rol: <span className="font-semibold">{user?.role}</span>.
+        Bienvenido, <span className="font-semibold">{user?.email}</span>
+        {' '}
+        <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+          {role}
+        </span>
       </p>
 
-      {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-          {error}
+      {/* Common section for both roles */}
+      <section className="mb-6">
+        <h2 className="mb-3 text-lg font-semibold text-gray-700">Estudiantes</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg bg-white p-4 shadow">
+            <p className="text-sm text-gray-500">Total Estudiantes</p>
+            <p className="text-2xl font-bold text-blue-600">--</p>
+          </div>
+          <div className="flex items-center justify-end">
+            <button className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+              Ver Estudiantes
+            </button>
+          </div>
         </div>
+      </section>
+
+      {/* Owner only: Payments section */}
+      {isOwner && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-lg font-semibold text-gray-700">Pagos</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm text-gray-500">Pagos Pendientes</p>
+              <p className="text-2xl font-bold text-yellow-600">--</p>
+            </div>
+            <div className="rounded-lg bg-white p-4 shadow">
+              <p className="text-sm text-gray-500">Pagos Vencidos</p>
+              <p className="text-2xl font-bold text-red-600">--</p>
+            </div>
+            <div className="flex items-center justify-end">
+              <button className="rounded-md bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700">
+                Ver Pagos
+              </button>
+            </div>
+          </div>
+        </section>
       )}
 
-      <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h2 className="mb-2 text-lg font-semibold text-gray-700">Estudiantes</h2>
-          <p className="text-3xl font-bold text-blue-600">
-            {loading ? '...' : data.students}
-          </p>
+      {/* Professor only: Register Payment section */}
+      {isProfessor && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-lg font-semibold text-gray-700">Pagos</h2>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <p className="mb-4 text-gray-600">
+              Registra un nuevo pago para un estudiante.
+            </p>
+            <button className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700">
+              Registrar Pago
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Quick actions - visible to both */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold text-gray-700">Acciones Rápidas</h2>
+        <div className="flex flex-wrap gap-3">
+          <button className="rounded-md border border-gray-300 bg-white px-4 py-2 hover:bg-gray-50">
+            Buscar Estudiante
+          </button>
+          {isOwner && (
+            <button className="rounded-md border border-gray-300 bg-white px-4 py-2 hover:bg-gray-50">
+              Generar Reporte
+            </button>
+          )}
         </div>
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h2 className="mb-2 text-lg font-semibold text-gray-700">Pagos Pendientes</h2>
-          <p className="text-3xl font-bold text-yellow-600">
-            {loading ? '...' : data.payments}
-          </p>
-        </div>
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h2 className="mb-2 text-lg font-semibold text-gray-700">Asistencias Hoy</h2>
-          <p className="text-3xl font-bold text-green-600">
-            {loading ? '...' : data.attendances}
-          </p>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }
