@@ -1,20 +1,20 @@
 import { useAuth } from '../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '../utils/permissions';
 
 /**
  * Dashboard - Main view after login
  *
- * Shows different sections based on user role:
- * - owner: sees Students and Payments sections
- * - professor: sees Students and Register Payment sections
- *
- * Future: Connect to backend for real data
+ * Shows different sections based on user permissions.
+ * Uses centralized permission system for role checks.
  */
 function Dashboard() {
   const { user } = useAuth();
-  const role = user?.role;
+  const navigate = useNavigate();
 
-  const isOwner = role === 'owner';
-  const isProfessor = role === 'professor';
+  const canViewStudents = hasPermission(user, 'canViewStudents');
+  const canViewPayments = hasPermission(user, 'canViewPayments');
+  const canViewReports = hasPermission(user, 'canViewReports');
 
   return (
     <div>
@@ -24,7 +24,7 @@ function Dashboard() {
         Bienvenido, <span className="font-semibold">{user?.email}</span>
         {' '}
         <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-          {role}
+          {user?.role}
         </span>
       </p>
 
@@ -37,15 +37,17 @@ function Dashboard() {
             <p className="text-2xl font-bold text-blue-600">--</p>
           </div>
           <div className="flex items-center justify-end">
-            <button className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+            <button
+              onClick={() => navigate("/students")} 
+              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
               Ver Estudiantes
             </button>
           </div>
         </div>
       </section>
 
-      {/* Owner only: Payments section */}
-      {isOwner && (
+      {/* Payments section - Owner and Professor */}
+      {canViewPayments && (
         <section className="mb-6">
           <h2 className="mb-3 text-lg font-semibold text-gray-700">Pagos</h2>
           <div className="grid gap-4 md:grid-cols-3">
@@ -66,10 +68,10 @@ function Dashboard() {
         </section>
       )}
 
-      {/* Professor only: Register Payment section */}
-      {isProfessor && (
+      {/* Create Payment section - Owner and Professor */}
+      {hasPermission(user, 'canCreatePayment') && (
         <section className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold text-gray-700">Pagos</h2>
+          <h2 className="mb-3 text-lg font-semibold text-gray-700">Registrar Pago</h2>
           <div className="rounded-lg bg-white p-6 shadow">
             <p className="mb-4 text-gray-600">
               Registra un nuevo pago para un estudiante.
@@ -88,7 +90,7 @@ function Dashboard() {
           <button className="rounded-md border border-gray-300 bg-white px-4 py-2 hover:bg-gray-50">
             Buscar Estudiante
           </button>
-          {isOwner && (
+          {canViewReports && (
             <button className="rounded-md border border-gray-300 bg-white px-4 py-2 hover:bg-gray-50">
               Generar Reporte
             </button>

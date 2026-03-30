@@ -264,6 +264,126 @@ tests/
 └── integration/         # Tests de integración
 ```
 
+## Sistema de Permisos (Frontend)
+
+Se implementó un sistema de permisos centralizado y reutilizable para controlar el acceso a funcionalidades según el rol del usuario.
+
+### Archivo: `src/utils/permissions.js`
+
+```javascript
+export const permissions = {
+  canViewStudents: ['owner', 'professor'],
+  canCreateStudent: ['owner', 'professor'],
+  canEditStudent: ['owner', 'professor'],
+  canDeleteStudent: ['owner'],
+  canViewPayments: ['owner', 'professor'],
+  canCreatePayment: ['owner', 'professor'],
+  canViewReports: ['owner'],
+};
+
+export const hasPermission = (user, permission) => {
+  return permissions[permission]?.includes(user?.role);
+};
+```
+
+### Uso de hasPermission
+
+```jsx
+import { useAuth } from '../auth/AuthContext';
+import { hasPermission } from '../utils/permissions';
+
+function MyComponent() {
+  const { user } = useAuth();
+
+  const canView = hasPermission(user, 'canViewStudents');
+  const canCreate = hasPermission(user, 'canCreateStudent');
+
+  return (
+    <div>
+      {canView && <StudentsList />}
+      {canCreate && <CreateStudentButton />}
+    </div>
+  );
+}
+```
+
+### Ventajas del sistema
+
+- **Centralizado**: Todos los permisos en un solo lugar
+- **Reutilizable**: Función `hasPermission` usada en toda la aplicación
+- **Mantenible**: Cambiar permisos solo requiere editar un archivo
+- **Testable**: Fácil de probar con diferentes roles
+
+## API Frontend - Estudiantes
+
+Archivo: `src/api/students.api.js`
+
+### Funciones disponibles
+
+```javascript
+import { getStudents, createStudent, searchStudents } from '../api/students.api';
+
+// Listar estudiantes (con paginación y filtros)
+const result = await getStudents(token, { page: 1, per_page: 20 });
+// Retorna: { items: [...], total: 50, pages: 3, current_page: 1 }
+
+// Crear estudiante
+const newStudent = await createStudent(token, {
+  first_name: 'Juan',
+  last_name: 'Pérez',
+  course: 'boxing', // 'boxing', 'kickboxing', 'both'
+  phone: '+56912345678',
+  address: 'Av. Principal 123'
+});
+
+// Buscar estudiantes
+const found = await searchStudents(token, 'juan');
+```
+
+### Endpoints del backend
+
+- `GET /students/` - Listar estudiantes
+- `POST /students/` - Crear estudiante
+- `GET /students/search?q={query}` - Buscar por nombre
+- `GET /students/{id}` - Obtener estudiante específico
+- `POST /students/{id}/deactivate` - Desactivar estudiante
+- `POST /students/{id}/activate` - Activar estudiante
+
+## Página de Estudiantes
+
+Archivo: `src/pages/Students.jsx`
+
+### Funcionalidades
+
+- **Listado**: Tabla con todos los estudiantes (nombre, apellido, curso, estado)
+- **Permisos**: Solo usuarios con `canViewStudents` pueden ver la página
+- **Creación**: Formulario condicional visible solo para `canCreateStudent`
+- **Estados**: Maneja loading, error y mensajes de éxito
+
+### Componente
+
+```jsx
+function Students() {
+  const { user, token } = useAuth();
+  const canView = hasPermission(user, 'canViewStudents');
+  const canCreate = hasPermission(user, 'canCreateStudent');
+
+  // Carga estudiantes del backend real
+  useEffect(() => {
+    if (canView && token) {
+      loadStudents();
+    }
+  }, [canView, token]);
+
+  // Render condicional según permisos
+  if (!canView) return <div>No tienes permiso</div>;
+
+  return (
+    // Lista de estudiantes + formulario condicional
+  );
+}
+```
+
 ## Frontend
 
 El frontend está en la carpeta `frontend/` y está construido con React + Vite + Tailwind CSS.
@@ -292,27 +412,29 @@ El frontend estará disponible en http://localhost:5173
 
 ### Dashboard Dinámico
 
-El Dashboard muestra contenido diferente según el rol del usuario autenticado:
+El Dashboard muestra contenido diferente según los permisos del usuario autenticado:
 
-**Común para ambos roles:**
+**Común para owner y professor:**
 - Sección **Estudiantes**: Ver lista de estudiantes
-
-**Owner ve:**
 - Sección **Pagos**: Ver pagos pendientes y vencidos
+- Sección **Registrar Pago**: Crear nuevos pagos
+
+**Solo owner:**
 - Botón **Generar Reporte**
 
-**Professor ve:**
-- Sección **Pagos**: Botón para registrar nuevo pago
-
-**Implementación:**
+**Implementación (con sistema de permisos):**
 ```jsx
-const { user } = useAuth();
-const isOwner = user?.role === 'owner';
-const isProfessor = user?.role === 'professor';
+import { hasPermission } from '../utils/permissions';
 
-// Render condicional basado en rol
-{isOwner && <PaymentsSection />}
-{isProfessor && <RegisterPaymentButton />}
+const { user } = useAuth();
+const canViewPayments = hasPermission(user, 'canViewPayments');
+const canCreatePayment = hasPermission(user, 'canCreatePayment');
+const canViewReports = hasPermission(user, 'canViewReports');
+
+// Render condicional basado en permisos
+{canViewPayments && <PaymentsSection />}
+{canCreatePayment && <RegisterPaymentButton />}
+{canViewReports && <GenerateReportButton />}
 ```
 
 ### Estructura Frontend

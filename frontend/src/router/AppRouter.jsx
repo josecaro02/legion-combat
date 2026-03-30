@@ -4,6 +4,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import Layout from '../components/Layout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
+import Students from '../pages/Students';
 
 /**
  * AppRouter - Main Router Configuration
@@ -36,6 +37,7 @@ function AppRouter() {
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/students" element={<Students/>} />
             </Route>
           </Route>
 
