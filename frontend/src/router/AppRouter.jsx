@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import Students from '../pages/Students';
+import Payments from '../pages/Payments';
 
 /**
  * AppRouter - Main Router Configuration
@@ -38,6 +39,7 @@ function AppRouter() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/students" element={<Students/>} />
+              <Route path="/payments" element={<Payments/>} />
             </Route>
           </Route>
 

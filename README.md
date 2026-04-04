@@ -203,6 +203,7 @@ curl -X GET http://localhost:5000/students/ \
 ### Payments
 - `GET /payments/` - Listar pagos
 - `POST /payments/` - Crear pago
+- `POST /payments/quick-pay` - Crear y marcar como pagado (Quick Pay)
 - `POST /payments/{id}/mark-paid` - Marcar como pagado
 - `GET /payments/upcoming` - Próximos vencimientos
 - `GET /payments/overdue` - Pagos vencidos
@@ -382,6 +383,177 @@ function Students() {
     // Lista de estudiantes + formulario condicional
   );
 }
+```
+
+
+## Flujo de Pagos (Quick Pay)
+
+
+
+Se implementó un endpoint simplificado para registrar pagos en una sola operación.
+
+
+
+### Endpoint: `POST /payments/quick-pay`
+
+
+
+**Propósito**: Crear el pago y marcarlo como pagado automáticamente.
+
+
+
+**Request**:
+
+```json
+
+{
+
+  "student_id": "uuid",
+
+  "amount": 25000,
+
+  "notes": "Pago mensualidad marzo"
+
+}
+
+```
+
+
+
+**Lógica del backend**:
+
+1. Obtiene la fecha actual del servidor (`date.today()`)
+
+2. Crea el pago con `status = pending` inicialmente
+
+3. Inmediatamente lo marca como pagado con `payment_date = today`
+
+4. Retorna el pago completo con `status = paid`
+
+
+
+
+### Frontend: Payments.jsx
+
+
+
+Archivo: `src/pages/Payments.jsx`
+
+
+
+**Características**:
+
+- Formulario simplificado: solo `student_id`, `amount`, `notes`
+
+- **No envía fechas**: el backend controla las fechas
+
+- Usa `quickPay()` para crear y pagar en una llamada
+
+- Lista muestra `status` y `payment_date`
+
+
+
+### Decisiones Tomadas
+
+
+
+1. **Backend como fuente de verdad**: Las fechas se generan en el servidor, no en el cliente
+
+2. **Un solo endpoint**: Simplifica la lógica de frontend (antes eran 2 llamadas)
+
+3. **Seguridad**: Previene manipulación de fechas desde el frontend
+
+4. **Consistencia**: Todas las fechas usan la hora del servidor
+
+## Flujo de Pagos (Quick Pay)
+
+Se implementó un flujo simplificado para registrar pagos que combina la creación y el marcado como pagado en un solo paso.
+
+### Endpoint
+
+```
+POST /payments/quick-pay
+```
+
+### Request
+
+```json
+{
+  "student_id": "uuid",
+  "amount": 25000,
+  "notes": "Pago mensualidad marzo"
+}
+```
+
+**Campos requeridos:**
+- `student_id`: UUID del estudiante
+- `amount`: Monto del pago (número positivo)
+
+**Campos opcionales:**
+- `notes`: Notas adicionales sobre el pago
+
+### Lógica del Backend
+
+1. **Validación**: Verifica que `student_id` y `amount` estén presentes
+2. **Creación**: Crea el pago con:
+   - `due_date`: fecha actual (hoy)
+   - `status`: pending (inicialmente)
+   - `idempotency_key`: generado automáticamente
+3. **Marcado**: Inmediatamente marca el pago como pagado:
+   - `status`: paid
+   - `payment_date`: fecha actual (hoy)
+4. **Retorno**: Devuelve el pago completo con status "paid"
+
+### Decisiones Técnicas
+
+**¿Por qué Quick Pay?**
+
+1. **Backend controla fechas**: El frontend NO envía fechas. El backend es la única fuente de verdad para las fechas de pago.
+
+2. **Simplificación**: Un solo endpoint reduce la complejidad en el frontend. Antes se necesitaba:
+   - Llamar a `POST /payments/` para crear
+   - Llamar a `POST /payments/{id}/mark-paid` para marcar como pagado
+
+3. **Seguridad**: Evita inconsistencias donde el frontend podría enviar fechas incorrectas o futuras.
+
+4. **Consistencia**: Todos los pagos registrados mediante Quick Pay tienen fechas confiables generadas por el servidor.
+
+### Uso en Frontend
+
+```javascript
+import { quickPay } from '../api/payments.api';
+
+// Registrar pago - el backend asigna todas las fechas
+const payment = await quickPay(token, {
+  student_id: 'uuid-del-estudiante',
+  amount: 25000,
+  notes: 'Pago mensualidad'
+});
+
+// payment.status === 'paid'
+// payment.payment_date === fecha de hoy
+```
+
+### UI: Payments.jsx
+
+La página de pagos usa el flujo simplificado:
+
+- **Formulario**: Solo campos `student_id`, `amount`, `notes`
+- **Sin fechas**: El usuario no selecciona fechas
+- **Confirmación**: Al guardar, el pago aparece inmediatamente como "Pagado"
+- **Refresh**: La lista se actualiza automáticamente después del registro
+
+### Comparación: Flujo Tradicional vs Quick Pay
+
+**Tradicional (2 pasos):**
+```javascript
+const payment = await createPayment(token, { student_id, amount, due_date });
+await markPaymentAsPaid(token, payment.id);
+```
+
+**Quick Pay (1 paso):**
+```javascript
+const payment = await quickPay(token, { student_id, amount });
 ```
 
 ## Frontend

@@ -60,7 +60,9 @@ function Dashboard() {
               <p className="text-2xl font-bold text-red-600">--</p>
             </div>
             <div className="flex items-center justify-end">
-              <button className="rounded-md bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700">
+              <button 
+                onClick={() => navigate("/payments")} 
+                className="rounded-md bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700">
                 Ver Pagos
               </button>
             </div>
