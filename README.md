@@ -626,6 +626,91 @@ frontend/
 └── tailwind.config.js
 ```
 
+## Dashboard Conectado a Backend
+
+El Dashboard ahora consume datos reales del backend en tiempo real.
+
+### Endpoints Utilizados
+
+- `GET /students/` - Obtiene el listado completo de estudiantes
+- `GET /payments/` - Obtiene el listado completo de pagos
+
+### Datos Mostrados
+
+| Métrica | Descripción | Origen |
+|---------|-------------|--------|
+| Total Estudiantes | Cantidad de estudiantes registrados | Backend - `GET /students/` |
+| Total Pagos | Cantidad de pagos registrados | Backend - `GET /payments/` |
+| Último Pago | Fecha del pago más reciente | Cálculo frontend sobre datos de `/payments/` |
+
+### Implementación
+
+```jsx
+// Dashboard.jsx - Lógica de conexión
+useEffect(() => {
+  async function fetchDashboardData() {
+    if (!token) return;
+
+    setLoading(true);
+    try {
+      const [studentsData, paymentsData] = await Promise.all([
+        canViewStudents ? authGet('/students/', token) : Promise.resolve([]),
+        canViewPayments ? authGet('/payments/', token) : Promise.resolve([])
+      ]);
+
+      setStudents(studentsData.items || studentsData || []);
+      setPayments(paymentsData.items || paymentsData || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  fetchDashboardData();
+}, [token, canViewStudents, canViewPayments]);
+```
+
+### Estados de UI
+
+- **Cargando**: Muestra "Cargando..." mientras se obtienen los datos
+- **Error**: Muestra mensaje de error si falla alguna petición
+- **Datos vacíos**: Muestra "--" cuando no hay datos disponibles
+
+### Limitación Actual (Quick Pay)
+
+Debido al uso del flujo **Quick Pay**:
+
+- Todos los pagos registrados tienen `status = "paid"`
+- No existen pagos "pending" ni "overdue" reales
+- La UI ha sido adaptada para mostrar:
+  - **Total Pagos** en lugar de "Pagos Pendientes"
+  - **Último Pago** (fecha más reciente) en lugar de "Pagos Vencidos"
+
+Esto refleja la naturaleza del sistema donde los pagos se registran al momento de ser recibidos.
+
+### Cómo Probar
+
+1. Iniciar sesión en la aplicación
+2. Navegar al Dashboard
+3. Verificar que se muestran:
+   - Total de estudiantes (número real)
+   - Total de pagos (número real)
+   - Fecha del último pago registrado
+
+### Flujo de Datos
+
+```
+Usuario → Dashboard.jsx → authGet() → Backend API
+                              ↓
+                        HTTP GET /students/
+                        HTTP GET /payments/
+                              ↓
+                        JSON Response
+                              ↓
+                    Calcula métricas → Render UI
+```
+
 ## Licencia
 
 MIT

@@ -1,20 +1,104 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '../utils/permissions';
+import { authGet } from '../api/client';
 
 /**
  * Dashboard - Main view after login
  *
  * Shows different sections based on user permissions.
  * Uses centralized permission system for role checks.
+ * Connected to real backend data.
  */
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const canViewStudents = hasPermission(user, 'canViewStudents');
   const canViewPayments = hasPermission(user, 'canViewPayments');
   const canViewReports = hasPermission(user, 'canViewReports');
+
+  // State for dashboard data
+  const [students, setStudents] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch data on component mount
+  useEffect(() => {
+    async function fetchDashboardData() {
+      if (!token) return;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Fetch students data
+        if (canViewStudents) {
+          const studentsData = await authGet('/students/', token);
+          // Handle both paginated and direct array responses
+          setStudents(studentsData.items || studentsData || []);
+        }
+
+        // Fetch payments data
+        if (canViewPayments) {
+          const paymentsData = await authGet('/payments/', token);
+          // Handle both paginated and direct array responses
+          setPayments(paymentsData.items || paymentsData || []);
+        }
+      } catch (err) {
+        setError(err.message || 'Error al cargar los datos');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDashboardData();
+  }, [token, canViewStudents, canViewPayments]);
+
+  // Calculate metrics
+  const totalStudents = students.length;
+  const totalPayments = payments.length;
+
+  // Get last payment date (most recent payment_date)
+  const getLastPaymentDate = () => {
+    if (!payments || payments.length === 0) return null;
+
+    const paidPayments = payments.filter(p => p.payment_date);
+    if (paidPayments.length === 0) return null;
+
+    const sorted = paidPayments.sort(
+      (a, b) => new Date(b.payment_date) - new Date(a.payment_date)
+    );
+
+    return sorted[0].payment_date;
+  };
+
+  const lastPaymentDate = getLastPaymentDate();
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Sin registros';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-CL', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div>
+        <h1 className="mb-2 text-2xl font-bold text-gray-800">Dashboard</h1>
+        <div className="flex h-64 items-center justify-center">
+          <p className="text-lg text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -28,17 +112,26 @@ function Dashboard() {
         </span>
       </p>
 
+      {/* Error message */}
+      {error && (
+        <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-800">
+          {error}
+        </div>
+      )}
+
       {/* Common section for both roles */}
       <section className="mb-6">
         <h2 className="mb-3 text-lg font-semibold text-gray-700">Estudiantes</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg bg-white p-4 shadow">
             <p className="text-sm text-gray-500">Total Estudiantes</p>
-            <p className="text-2xl font-bold text-blue-600">--</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {totalStudents > 0 ? totalStudents : '--'}
+            </p>
           </div>
           <div className="flex items-center justify-end">
             <button
-              onClick={() => navigate("/students")} 
+              onClick={() => navigate("/students")}
               className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
               Ver Estudiantes
             </button>
@@ -52,16 +145,20 @@ function Dashboard() {
           <h2 className="mb-3 text-lg font-semibold text-gray-700">Pagos</h2>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Pagos Pendientes</p>
-              <p className="text-2xl font-bold text-yellow-600">--</p>
+              <p className="text-sm text-gray-500">Total Pagos</p>
+              <p className="text-2xl font-bold text-green-600">
+                {totalPayments > 0 ? totalPayments : '--'}
+              </p>
             </div>
             <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Pagos Vencidos</p>
-              <p className="text-2xl font-bold text-red-600">--</p>
+              <p className="text-sm text-gray-500">Ultimo Pago</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {lastPaymentDate ? formatDate(lastPaymentDate) : '--'}
+              </p>
             </div>
             <div className="flex items-center justify-end">
-              <button 
-                onClick={() => navigate("/payments")} 
+              <button
+                onClick={() => navigate("/payments")}
                 className="rounded-md bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700">
                 Ver Pagos
               </button>
