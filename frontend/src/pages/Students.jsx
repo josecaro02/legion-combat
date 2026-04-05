@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../utils/permissions';
-import { getStudents, createStudent } from '../api/students.api';
+import { getStudents, createStudent, searchStudents } from '../api/students.api';
 
+/**
+ * Students Component
+ *
+ * Muestra lista de estudiantes con funcionalidad de búsqueda en tiempo real.
+ * Incluye debounce para optimizar las llamadas a la API.
+ */
 function Students() {
   const { user, token } = useAuth();
   const [students, setStudents] = useState([]);
@@ -19,6 +25,12 @@ function Students() {
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(false);
 
+  // Estados para búsqueda
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
   const canView = hasPermission(user, 'canViewStudents');
   const canCreate = hasPermission(user, 'canCreateStudent');
 
@@ -29,6 +41,46 @@ function Students() {
       setLoading(false);
     }
   }, [canView, token]);
+
+  /**
+   * Efecto de búsqueda con debounce
+   * Espera 400ms después de que el usuario deja de escribir
+   * Solo busca si hay 2 o más caracteres
+   */
+  useEffect(() => {
+    if (!token || !canView) return;
+
+    // Si el input está vacío, limpiar resultados y mostrar lista original
+    if (!searchTerm.trim()) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      setSearchError(null);
+      return;
+    }
+
+    // Solo buscar si tiene 2 o más caracteres
+    if (searchTerm.trim().length < 2) {
+      setSearchResults(null);
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError(null);
+
+    const debounceTimer = setTimeout(async () => {
+      try {
+        const results = await searchStudents(token, searchTerm.trim());
+        setSearchResults(results || []);
+      } catch (err) {
+        setSearchError(err.message || 'Error al buscar estudiantes');
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400); // 400ms de debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm, token, canView]);
 
   async function loadStudents() {
     try {
@@ -71,6 +123,30 @@ function Students() {
     setFormData(prev => ({ ...prev, [name]: value }));
   }
 
+  /**
+   * Maneja cambios en el input de búsqueda
+   * Actualiza searchTerm que dispara el efecto con debounce
+   */
+  function handleSearchChange(e) {
+    setSearchTerm(e.target.value);
+  }
+
+  /**
+   * Limpia el campo de búsqueda y vuelve a la lista original
+   */
+  function clearSearch() {
+    setSearchTerm('');
+    setSearchResults(null);
+    setSearchError(null);
+  }
+
+  /**
+   * Determina qué estudiantes mostrar
+   * Si hay resultados de búsqueda, los muestra; si no, muestra la lista original
+   */
+  const displayedStudents = searchResults !== null ? searchResults : students;
+  const isSearching = searchTerm.trim().length >= 2;
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -100,6 +176,81 @@ function Students() {
           </button>
         )}
       </div>
+
+      {/* Barra de búsqueda */}
+      {canView && (
+        <div className="mb-4">
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <svg
+                className="h-5 w-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar estudiante..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-10 focus:border-blue-500 focus:outline-none"
+            />
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Estados de búsqueda */}
+          {searchLoading && (
+            <div className="mt-2 text-sm text-gray-500">
+              Buscando...
+            </div>
+          )}
+
+          {searchError && (
+            <div className="mt-2 text-sm text-red-600">
+              {searchError}
+            </div>
+          )}
+
+          {isSearching && !searchLoading && searchResults?.length === 0 && (
+            <div className="mt-2 text-sm text-gray-600">
+              No se encontraron resultados para "{searchTerm}"
+            </div>
+          )}
+
+          {searchResults?.length > 0 && (
+            <div className="mt-2 text-sm text-gray-600">
+              {searchResults.length} resultado{searchResults.length !== 1 ? 's' : ''} encontrado{searchResults.length !== 1 ? 's' : ''}
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">
@@ -229,17 +380,19 @@ function Students() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {students.length === 0 ? (
+              {displayedStudents.length === 0 ? (
                 <tr>
                   <td
                     colSpan="4"
                     className="px-4 py-8 text-center text-gray-500"
                   >
-                    No hay estudiantes registrados.
+                    {isSearching
+                      ? `No se encontraron resultados para "${searchTerm}"`
+                      : 'No hay estudiantes registrados.'}
                   </td>
                 </tr>
               ) : (
-                students.map(student => (
+                displayedStudents.map(student => (
                   <tr key={student.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {student.first_name}

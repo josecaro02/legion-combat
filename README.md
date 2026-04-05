@@ -929,6 +929,133 @@ Hace clic en "Registrar Pago"
 6. **Ver lista**: La tabla se actualiza con el nuevo pago
 7. **Auto-cierre**: El formulario se cierra solo después de 2 segundos
 
+## Búsqueda de Estudiantes
+
+Se implementó una funcionalidad de búsqueda en tiempo real para encontrar estudiantes por nombre o apellido.
+
+### Endpoint Utilizado
+
+- `GET /students/search?q={texto}` - Busca estudiantes por nombre
+
+### Comportamiento del Input
+
+| Condición | Acción |
+|-----------|--------|
+| Input vacío | Muestra la lista completa de estudiantes |
+| 1 carácter | No realiza búsqueda (espera...) |
+| ≥ 2 caracteres | Lanza búsqueda con debounce de 400ms |
+| Resultados encontrados | Muestra cantidad de resultados |
+| Sin resultados | Muestra "No se encontraron resultados" |
+
+### Implementación del Debounce
+
+```jsx
+useEffect(() => {
+  if (!token) return;
+
+  // Limpiar resultados si input vacío
+  if (!searchTerm || searchTerm.trim() === '') {
+    setSearchResults(null);
+    return;
+  }
+
+  // No buscar si tiene menos de 2 caracteres
+  if (searchTerm.trim().length < 2) {
+    return;
+  }
+
+  setSearchLoading(true);
+
+  const timeoutId = setTimeout(async () => {
+    try {
+      const results = await searchStudents(token, searchTerm.trim());
+      setSearchResults(results || []);
+    } catch (err) {
+      setSearchError(err.message);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, 400); // 400ms de debounce
+
+  return () => clearTimeout(timeoutId);
+}, [searchTerm, token]);
+```
+
+### UI de Búsqueda
+
+**Input con icono de búsqueda:**
+```jsx
+<div className="relative">
+  <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+    <SearchIcon className="h-5 w-5 text-gray-400" />
+  </div>
+  <input
+    type="text"
+    placeholder="Buscar estudiante..."
+    value={searchTerm}
+    onChange={handleSearchChange}
+    className="w-full py-2 pl-10 pr-10"
+  />
+  {/* Botón limpiar (X) aparece cuando hay texto */}
+  {searchTerm && (
+    <button onClick={clearSearch}>
+      <XIcon className="h-5 w-5" />
+    </button>
+  )}
+</div>
+```
+
+**Estados visuales:**
+- **Cargando**: "Buscando..." debajo del input
+- **Error**: Mensaje en rojo
+- **Sin resultados**: "No se encontraron resultados para 'texto'"
+- **Con resultados**: "X resultados encontrados"
+
+### Lógica de Visualización
+
+```jsx
+// Determina qué estudiantes mostrar
+const displayedStudents = searchResults !== null ? searchResults : students;
+const isSearching = searchTerm.trim().length >= 2;
+
+// En la tabla
+{isSearching
+  ? `No se encontraron resultados para "${searchTerm}"`
+  : 'No hay estudiantes registrados.'}
+```
+
+### Estados del Componente
+
+```jsx
+const [searchTerm, setSearchTerm] = useState('');
+const [searchResults, setSearchResults] = useState(null);
+const [searchLoading, setSearchLoading] = useState(false);
+const [searchError, setSearchError] = useState(null);
+```
+
+- `searchTerm`: Texto actual del input
+- `searchResults`: Resultados de la búsqueda (null = no hay búsqueda activa)
+- `searchLoading`: Indicador de carga durante la búsqueda
+- `searchError`: Mensaje de error si falla la petición
+
+### Cómo Probar
+
+1. Ir a `/students`
+2. Escribir un nombre en el input de búsqueda
+3. Esperar 400ms (debounce)
+4. Ver resultados filtrados
+5. Ver mensaje con cantidad de resultados
+6. Borrar el input (X) → vuelve la lista completa
+7. Escribir texto que no exista → ver "No se encontraron resultados"
+
+### Edge Cases Manejados
+
+- **Query < 2 chars**: No se realiza la búsqueda
+- **Input vacío**: Se limpian resultados y se muestra lista original
+- **Usuario escribe rápido**: El debounce cancela búsquedas previas
+- **Error de red**: Se muestra mensaje de error amigable
+- **Token expirado**: Se maneja en el catch del error
+
 ## Licencia
 
 MIT
