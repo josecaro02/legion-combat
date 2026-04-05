@@ -711,6 +711,224 @@ Usuario → Dashboard.jsx → authGet() → Backend API
                     Calcula métricas → Render UI
 ```
 
+## Mejoras UX en Pagos
+
+Se implementaron mejoras significativas en la experiencia de usuario del módulo de pagos para hacerlo más intuitivo, robusto y amigable.
+
+### 1. Loading States
+
+**Durante el envío del formulario:**
+- El botón se deshabilita mientras se procesa el pago
+- Se muestra un spinner de carga animado
+- Texto cambia de "Registrar Pago" a "Procesando..."
+
+```jsx
+<button disabled={formLoading}>
+  {formLoading ? (
+    <span className="flex items-center gap-2">
+      <svg className="animate-spin" ... />
+      Procesando...
+    </span>
+  ) : 'Registrar Pago'}
+</button>
+```
+
+### 2. Mensaje de Éxito
+
+Al completarse el pago exitosamente, se muestra:
+
+- **Icono de check** verde
+- **Mensaje claro**: "Pago registrado correctamente"
+- **Detalles del pago**: Monto y fecha del pago recién creado
+- **Auto-cierre**: El formulario se cierra automáticamente después de 2 segundos
+
+```jsx
+{formSuccess && (
+  <div className="rounded bg-green-100 p-4 text-green-700">
+    <div className="flex items-center gap-2">
+      <CheckIcon />
+      <span className="font-medium">Pago registrado correctamente</span>
+    </div>
+    {lastPayment && (
+      <div className="mt-2 text-sm">
+        <p>Monto: <span className="font-medium">${lastPayment.amount}</span></p>
+        <p>Fecha: <span className="font-medium">{formatDate(lastPayment.payment_date)}</span></p>
+      </div>
+    )}
+  </div>
+)}
+```
+
+### 3. Manejo de Errores
+
+**Errores por campo:**
+- Borde rojo en el input con error
+- Mensaje específico debajo de cada campo
+- Limpieza automática de errores al escribir
+
+**Error general:**
+- Mensaje destacado en rojo con icono
+- Texto descriptivo: "Error al registrar el pago. Intenta nuevamente."
+
+```jsx
+// Errores de validación
+const [fieldErrors, setFieldErrors] = useState({});
+
+// Mostrar error en campo
+<select className={`border ${fieldErrors.student_id ? 'border-red-500' : 'border-gray-300'}`}>
+{fieldErrors.student_id && (
+  <p className="text-xs text-red-600">{fieldErrors.student_id}</p>
+)}
+```
+
+### 4. Reset de Formulario
+
+Después de un pago exitoso:
+
+1. **Limpieza de campos**: `student_id`, `amount`, `notes` → `''`
+2. **Limpieza de errores**: `fieldErrors` → `{}`
+3. **Cierre automático**: El formulario se cierra después de 2 segundos
+4. **Refresh de lista**: La tabla se actualiza inmediatamente
+
+```jsx
+setFormData({ student_id: '', amount: '', notes: '' });
+setFieldErrors({});
+await loadPayments(); // Recarga la tabla
+```
+
+### 5. Validaciones
+
+**Validaciones en tiempo real:**
+
+| Campo | Validación | Mensaje de error |
+|-------|------------|------------------|
+| `student_id` | Requerido | "Debes seleccionar un estudiante" |
+| `amount` | > 0 | "El monto debe ser mayor a 0" |
+| `amount` | Número válido | (HTML5 native validation) |
+
+**Implementación:**
+
+```jsx
+function validateForm() {
+  const errors = {};
+
+  if (!formData.student_id) {
+    errors.student_id = 'Debes seleccionar un estudiante';
+  }
+
+  const amountValue = parseFloat(formData.amount);
+  if (!formData.amount || isNaN(amountValue) || amountValue <= 0) {
+    errors.amount = 'El monto debe ser mayor a 0';
+  }
+
+  setFieldErrors(errors);
+  return Object.keys(errors).length === 0;
+}
+```
+
+### 6. Feedback Visual
+
+**Detalles del último pago:**
+
+Después de crear un pago, se muestra:
+- Monto del pago registrado
+- Fecha de pago formateada (DD/MM/YYYY)
+
+```jsx
+const [lastPayment, setLastPayment] = useState(null);
+
+// Al crear pago exitoso
+const result = await quickPay(token, data);
+setLastPayment(result);
+
+// Mostrar en UI
+<p>Monto: <span className="font-medium">${lastPayment.amount}</span></p>
+<p>Fecha: <span className="font-medium">{formatDate(lastPayment.payment_date)}</span></p>
+```
+
+### 7. UX Extra (Bonus)
+
+**Botón deshabilitado si faltan campos:**
+
+```jsx
+function isFormValid() {
+  const hasStudent = formData.student_id?.trim() !== '';
+  const hasAmount = parseFloat(formData.amount) > 0;
+  return hasStudent && hasAmount && !formLoading;
+}
+
+<button disabled={!isFormValid() || formLoading}>
+```
+
+**Estilos de error en campos:**
+
+```jsx
+<select className={`border px-3 py-2 ${
+  fieldErrors.student_id
+    ? 'border-red-500 focus:border-red-500'  // Error
+    : 'border-gray-300 focus:border-blue-500' // Normal
+}`}>
+```
+
+**Limpieza de errores al escribir:**
+
+```jsx
+function handleInputChange(e) {
+  const { name, value } = e.target;
+  setFormData(prev => ({ ...prev, [name]: value }));
+
+  // Limpiar error del campo
+  if (fieldErrors[name]) {
+    setFieldErrors(prev => ({ ...prev, [name]: null }));
+  }
+}
+```
+
+**Indicadores de campo obligatorio:**
+
+```jsx
+<label>
+  Estudiante <span className="text-red-500">*</span>
+</label>
+```
+
+### Resumen de Estados
+
+```
+Usuario abre formulario
+        ↓
+Selecciona estudiante y monto
+        ↓
+Hace clic en "Registrar Pago"
+        ↓
+┌─────────────────┬─────────────────┐
+│  VALIDACIÓN OK  │ VALIDACIÓN FAIL │
+│                 │                 │
+│  Botón cambia   │  Muestra errores│
+│  a "Procesando" │  en campos      │
+│                 │                 │
+│  Request al API │  Usuario corrige│
+│                 │                 │
+│  ÉXITO          │                 │
+│  - Verde: "Pago │                 │
+│    registrado"  │                 │
+│  - Detalles     │                 │
+│  - Reset campos │                 │
+│  - Refresh lista│                 │
+│  - Auto-cierre  │                 │
+└─────────────────┴─────────────────┘
+```
+
+### Cómo Probar
+
+1. **Abrir formulario**: Clic en "Registrar Pago"
+2. **Validaciones**: Intentar enviar sin completar campos → ver errores
+3. **Crear pago**: Completar campos válidos → clic en "Registrar Pago"
+4. **Ver loading**: Botón cambia a "Procesando..." con spinner
+5. **Ver éxito**: Mensaje verde con check y detalles del pago
+6. **Ver lista**: La tabla se actualiza con el nuevo pago
+7. **Auto-cierre**: El formulario se cierra solo después de 2 segundos
+
 ## Licencia
 
 MIT
