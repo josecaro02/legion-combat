@@ -63,7 +63,8 @@ class PaymentListResponse(BaseModel):
 
 class PaymentWithStudentResponse(PaymentResponse):
     """Payment with student info response."""
-    student_name: str
+    student_name: Optional[str]
+
 
 
 class OverduePaymentSummary(BaseModel):

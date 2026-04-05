@@ -22,6 +22,15 @@ class PaymentRepository(BaseRepository[Payment]):
         stmt = select(Payment).where(Payment.idempotency_key == key)
         return db.session.execute(stmt).scalar_one_or_none()
 
+    def get_all(self, skip: int = 0, limit: int = 100) -> List[Payment]:
+        stmt = (
+            select(Payment)
+            .options(joinedload(Payment.student))
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(db.session.execute(stmt).scalars().all())
+
     def get_by_student(
         self,
         student_id: UUID,
@@ -30,7 +39,9 @@ class PaymentRepository(BaseRepository[Payment]):
         limit: int = 100
     ) -> List[Payment]:
         """Get payments by student."""
-        stmt = select(Payment).where(Payment.student_id == student_id)
+        stmt = (select(Payment)
+                .options(joinedload(Payment.student))
+                .where(Payment.student_id == student_id))
         if status:
             stmt = stmt.where(Payment.status == status)
         stmt = stmt.offset(skip).limit(limit)
@@ -43,7 +54,9 @@ class PaymentRepository(BaseRepository[Payment]):
         limit: int = 100
     ) -> List[Payment]:
         """Get payments by status."""
-        stmt = select(Payment).where(Payment.status == status).offset(skip).limit(limit)
+        stmt = (select(Payment)
+                .options(joinedload(Payment.student))
+                .where(Payment.status == status).offset(skip).limit(limit))
         return list(db.session.execute(stmt).scalars().all())
 
     def get_overdue_payments(self, skip: int = 0, limit: int = 100) -> List[Payment]:

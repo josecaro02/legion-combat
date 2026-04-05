@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 
 from app.middleware.auth_middleware import jwt_required
 from app.middleware.rbac_middleware import require_professor
-from app.schemas.payment import PaymentCreate, PaymentResponse, PaymentUpdate
+from app.schemas.payment import PaymentCreate, PaymentResponse, PaymentUpdate, PaymentWithStudentResponse
 from app.services.payment_service import PaymentService
 
 payment_bp = Blueprint('payments', __name__)
@@ -84,7 +84,13 @@ def list_payments():
             per_page=per_page
         )
         return jsonify({
-            'items': [PaymentResponse.from_orm(p).model_dump() for p in result['items']],
+            'items': [
+              PaymentWithStudentResponse(
+                  **PaymentResponse.model_validate(p).model_dump(),
+                  student_name=p.student.full_name if p.student else None
+              ).model_dump(mode="json")
+              for p in result['items']
+            ],
             'total': result['total'],
             'pages': result['pages'],
             'current_page': result['current_page']
@@ -290,6 +296,124 @@ def update_payment(payment_id: UUID):
             'error': 'VALIDATION_ERROR',
             'message': str(e)
         }), 400
+
+
+@payment_bp.route('/quick-pay', methods=['POST'])
+@jwt_required
+@require_professor
+def quick_pay():
+    """Quick pay - Create payment and mark as paid in one operation.
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - student_id
+            - amount
+          properties:
+            student_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            amount:
+              type: number
+              format: decimal
+              description: Payment amount (positive number)
+              example: 25000.00
+            notes:
+              type: string
+              description: Optional notes
+    responses:
+      201:
+        description: Payment created and marked as paid successfully
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            student_id:
+              type: string
+              format: uuid
+            amount:
+              type: string
+            status:
+              type: string
+              example: "paid"
+            due_date:
+              type: string
+              format: date
+            payment_date:
+              type: string
+              format: date
+            notes:
+              type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+    """
+    from datetime import date
+    from uuid import uuid4
+    from decimal import Decimal
+
+    data = request.get_json()
+
+    # Validate required fields
+    student_id = data.get('student_id')
+    amount = data.get('amount')
+
+    if not student_id:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'student_id is required'
+        }), 400
+
+    if not amount:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'amount is required'
+        }), 400
+
+    try:
+        amount = Decimal(str(amount))
+        if amount <= 0:
+            raise ValueError("Amount must be greater than 0")
+    except (ValueError, TypeError):
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'amount must be a positive number'
+        }), 400
+
+    today = date.today()
+
+    try:
+        # 1. Create payment with due_date = today, status = pending
+        payment = payment_service.create_payment(
+            student_id=UUID(student_id),
+            amount=amount,
+            due_date=today,
+            idempotency_key=str(uuid4()),
+            notes=data.get('notes')
+        )
+
+        # 2. Mark as paid
+        payment = payment_service.mark_as_paid(payment.id, today)
+
+        return jsonify(PaymentResponse.from_orm(payment).model_dump()), 201
+    except Exception as e:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': str(e)
+        }), 400
+
 
 
 @payment_bp.route('/<uuid:payment_id>', methods=['DELETE'])
