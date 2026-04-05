@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { quickPay, getPayments } from '../api/payments.api';
@@ -13,6 +14,7 @@ import { getStudents } from '../api/students.api';
  */
 function Payments() {
   const { user, token } = useAuth();
+  const location = useLocation();
   const [payments, setPayments] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,22 @@ function Payments() {
       setLoading(false);
     }
   }, [canView, token]);
+
+  /**
+   * Efecto para manejar estudiante preseleccionado desde navegación
+   */
+  useEffect(() => {
+    const preselectedStudentId = location.state?.preselectedStudentId;
+    if (preselectedStudentId && token) {
+      setShowForm(true);
+      setFormData((prev) => ({
+        ...prev,
+        student_id: preselectedStudentId,
+      }));
+      // Limpiar el estado de navegación
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, token]);
 
   useEffect(() => {
     if (token && showForm) {

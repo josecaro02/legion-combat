@@ -1056,6 +1056,197 @@ const [searchError, setSearchError] = useState(null);
 - **Error de red**: Se muestra mensaje de error amigable
 - **Token expirado**: Se maneja en el catch del error
 
+## Detalle de Estudiante
+
+Se implementó una página de detalle para visualizar la información completa de un estudiante y su historial de pagos.
+
+### Endpoint Utilizado
+
+- `GET /payments/student/{student_id}` - Obtiene todos los pagos de un estudiante específico
+
+### Navegación
+
+Desde la lista de estudiantes (`/students`), cada fila es clickeable y lleva al detalle del estudiante:
+
+```
+/students/:id
+```
+
+### Componente: StudentDetail.jsx
+
+Archivo: `src/pages/StudentDetail.jsx`
+
+**Funcionalidades:**
+
+- **Información del estudiante**: Nombre, curso, teléfono, dirección, estado y fecha de inscripción
+- **Historial de pagos**: Tabla con montos, estados, fechas de pago y vencimiento
+- **Registro rápido**: Botón "Registrar Pago" que navega a `/payments` con el estudiante preseleccionado
+- **Navegación**: Botón "Volver" para regresar a la lista de estudiantes
+
+### Estructura de Datos Mostrados
+
+**Información del Estudiante:**
+| Campo | Descripción |
+|-------|-------------|
+| Nombre | first_name + last_name |
+| Curso | boxing / kickboxing / both |
+| Teléfono | phone (si existe) |
+| Dirección | address (si existe) |
+| Estado | Activo / Inactivo |
+| Inscripción | enrollment_date |
+
+**Historial de Pagos:**
+| Campo | Descripción |
+|-------|-------------|
+| Monto | amount |
+| Estado | Pagado / Pendiente / Vencido (con badge de color) |
+| Fecha de Pago | payment_date |
+| Fecha de Vencimiento | due_date |
+
+### UX y Estados
+
+**Loading State:**
+- Muestra "Cargando..." centrado mientras se obtienen los datos
+
+**Error State:**
+- Mensaje de error con botón para volver a la lista de estudiantes
+
+**Sin Pagos:**
+- Mensaje: "Este estudiante no tiene pagos registrados."
+
+### Integración con Quick Pay
+
+El botón "Registrar Pago" utiliza la navegación de React Router para pasar el ID del estudiante:
+
+```jsx
+function handleRegisterPayment() {
+  navigate('/payments', {
+    state: { preselectedStudentId: id },
+  });
+}
+```
+
+En `Payments.jsx`, el componente detecta este estado y:
+1. Abre automáticamente el formulario de registro
+2. Preselecciona el estudiante en el dropdown
+3. Limpia el estado de navegación para evitar repeticiones
+
+```jsx
+useEffect(() => {
+  const preselectedStudentId = location.state?.preselectedStudentId;
+  if (preselectedStudentId && token) {
+    setShowForm(true);
+    setFormData(prev => ({ ...prev, student_id: preselectedStudentId }));
+    window.history.replaceState({}, document.title);
+  }
+}, [location.state, token]);
+```
+
+### Cómo Probar
+
+1. **Navegar a estudiantes**: Ir a `/students`
+2. **Seleccionar estudiante**: Hacer clic en cualquier fila de la tabla
+3. **Ver detalle**: Se muestra la información del estudiante y su historial de pagos
+4. **Registrar pago**: Clic en "Registrar Pago" → redirige a `/payments` con el estudiante preseleccionado
+5. **Volver**: Clic en "Volver a Estudiantes" para regresar a la lista
+
+## Detalle de Estudiante
+
+Se implementó una página para visualizar el detalle de un estudiante específico y su historial de pagos.
+
+### Página: StudentDetail.jsx
+
+Archivo: `src/pages/StudentDetail.jsx`
+
+### Cómo Navegar
+
+Desde la lista de estudiantes (`/students`):
+1. Haz clic en cualquier fila de la tabla de estudiantes
+2. Se navegará automáticamente a `/students/{id}`
+
+Desde cualquier otra página:
+1. Navegar directamente a `/students/{id}` reemplazando `{id}` con el UUID del estudiante
+
+### Información Mostrada
+
+#### Información del Estudiante
+- **Nombre completo**: Nombre y apellido del estudiante
+- **Curso**: El curso al que está inscrito (boxeo, kickboxing, ambos)
+- **Teléfono**: Número de contacto (si existe)
+- **Dirección**: Dirección registrada (si existe)
+- **Estado**: Activo o inactivo
+- **Fecha de Inscripción**: Fecha en que se registró
+
+#### Historial de Pagos
+Tabla con los pagos del estudiante mostrando:
+- **Monto**: Valor del pago en pesos chilenos
+- **Estado**: Pagado (verde), Pendiente (amarillo), Vencido (rojo)
+- **Fecha de Pago**: Cuándo se realizó el pago
+- **Fecha de Vencimiento**: Fecha límite del pago
+
+### Endpoint Utilizado
+
+```
+GET /payments/student/{student_id}
+```
+
+**Response**:
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "amount": 25000,
+      "status": "paid",
+      "payment_date": "2024-03-15",
+      "due_date": "2024-03-31"
+    }
+  ],
+  "total": 5,
+  "pages": 1,
+  "current_page": 1
+}
+```
+
+### Estados de UI
+
+- **Cargando**: Muestra "Cargando..." mientras se obtienen los datos del estudiante y sus pagos
+- **Error**: Muestra mensaje de error si falla la carga con botón para volver a la lista
+- **Sin pagos**: Muestra mensaje "Este estudiante no tiene pagos registrados." cuando el estudiante no tiene pagos
+
+### Funcionalidad Bonus: Registrar Pago
+
+El botón **"Registrar Pago"** en la esquina superior derecha permite:
+1. Navegar a la página de pagos (`/payments`)
+2. Abrir automáticamente el formulario de registro
+3. Preseleccionar al estudiante actual en el dropdown
+
+**Flujo de navegación**:
+```javascript
+navigate('/payments', {
+  state: { preselectedStudentId: id },
+});
+```
+
+### Cómo Probar
+
+1. Ir a la página de estudiantes (`/students`)
+2. Hacer clic en cualquier estudiante de la tabla
+3. Verificar que se muestra:
+   - Información completa del estudiante
+   - Tabla con el historial de pagos
+   - Mensaje si el estudiante no tiene pagos
+4. (Opcional) Clic en "Registrar Pago" para ir a la página de pagos con el estudiante preseleccionado
+
+### Componentes Utilizados
+
+| Componente | Descripción |
+|-------------|-------------|
+| `useParams` | Obtiene el `id` del estudiante de la URL |
+| `useNavigate` | Navega a la lista de estudiantes o a pagos |
+| `getStudent` | Obtiene datos del estudiante por ID |
+| `getStudentPayments` | Obtiene los pagos del estudiante |
+
 ## Licencia
 
 MIT
