@@ -1,5 +1,5 @@
 """Payment repository."""
-from datetime import date
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -61,26 +61,26 @@ class PaymentRepository(BaseRepository[Payment]):
 
     def get_overdue_payments(self, skip: int = 0, limit: int = 100) -> List[Payment]:
         """Get overdue payments."""
-        today = date.today()
+        now = datetime.now(timezone.utc)
         stmt = select(Payment).where(
             Payment.status == PaymentStatus.PENDING,
-            Payment.due_date < today
+            Payment.due_date < now
         ).offset(skip).limit(limit)
         return list(db.session.execute(stmt).scalars().all())
 
     def get_upcoming_payments(self, days: int = 5, skip: int = 0, limit: int = 100) -> List[Payment]:
         """Get payments due in the next N days."""
         from datetime import timedelta
-        today = date.today()
-        target_date = today + timedelta(days=days)
+        now = datetime.now(timezone.utc)
+        target_date = now + timedelta(days=days)
         stmt = select(Payment).where(
             Payment.status == PaymentStatus.PENDING,
             Payment.due_date <= target_date,
-            Payment.due_date >= today
+            Payment.due_date >= now
         ).offset(skip).limit(limit)
         return list(db.session.execute(stmt).scalars().all())
 
-    def get_payments_due_before(self, target_date: date, status: PaymentStatus) -> List[Payment]:
+    def get_payments_due_before(self, target_date: datetime, status: PaymentStatus) -> List[Payment]:
         """Get payments due before a date with specific status."""
         stmt = select(Payment).where(
             Payment.status == status,
@@ -98,13 +98,13 @@ class PaymentRepository(BaseRepository[Payment]):
     def get_overdue_summary(self) -> List[dict]:
         """Get summary of overdue payments by student."""
         from sqlalchemy import func
-        today = date.today()
+        now = datetime.now(timezone.utc)
         stmt = select(
             Payment.student_id,
             func.count(Payment.id).label('overdue_count'),
             func.sum(Payment.amount).label('total_owed')
         ).where(
             Payment.status == PaymentStatus.PENDING,
-            Payment.due_date < today
+            Payment.due_date < now
         ).group_by(Payment.student_id)
         return list(db.session.execute(stmt).mappings().all())

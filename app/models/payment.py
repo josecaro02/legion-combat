@@ -1,10 +1,10 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum as PyEnum
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Date, ForeignKey, Index, Numeric, String, Text, Enum
+from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, Text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import Base
@@ -39,12 +39,12 @@ class Payment(Base, TimestampMixin):
         Numeric(10, 2),
         nullable=False
     )
-    payment_date: Mapped[Optional[date]] = mapped_column(
-        Date,
+    payment_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
         nullable=True
     )
-    due_date: Mapped[date] = mapped_column(
-        Date,
+    due_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         index=True,
         nullable=False
     )
@@ -95,9 +95,12 @@ class Payment(Base, TimestampMixin):
 
     def is_overdue(self) -> bool:
         """Check if payment is overdue."""
-        return self.status == PaymentStatus.PENDING and self.due_date < date.today()
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        return self.status == PaymentStatus.PENDING and self.due_date < now
 
-    def mark_as_paid(self, payment_date: Optional[date] = None) -> None:
+    def mark_as_paid(self, payment_date: Optional[datetime] = None) -> None:
         """Mark payment as paid."""
+        from datetime import datetime, timezone
         self.status = PaymentStatus.PAID
-        self.payment_date = payment_date or date.today()
+        self.payment_date = payment_date or datetime.now(timezone.utc)

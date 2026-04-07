@@ -1247,6 +1247,222 @@ navigate('/payments', {
 | `getStudent` | Obtiene datos del estudiante por ID |
 | `getStudentPayments` | Obtiene los pagos del estudiante |
 
+## Manejo de Fechas y Consistencia en Pagos
+
+El sistema implementa un manejo estandarizado de fechas para garantizar consistencia entre backend y frontend, evitando problemas de zonas horarias y formatos.
+
+### Estándar Global
+
+Todas las fechas en el sistema siguen estas reglas:
+
+1. **Usar SIEMPRE datetime con timezone (UTC)**
+   ```python
+   from datetime import datetime, timezone
+   now = datetime.now(timezone.utc)
+   ```
+
+2. **NO usar:**
+   - `date.today()` - No tiene información de hora ni timezone
+   - `datetime.now()` sin timezone - Puede causar inconsistencias
+
+3. **Para sumar meses usar relativedelta:**
+   ```python
+   from dateutil.relativedelta import relativedelta
+   due_date = now + relativedelta(months=1)
+   ```
+
+### Diferencia: 30 días vs 1 mes
+
+Es importante entender la diferencia:
+
+| Método | Resultado | Casos borde |
+|--------|-----------|-------------|
+| `timedelta(days=30)` | Simplemente suma 30 días | Enero 31 → Marzo 2 |
+| `relativedelta(months=1)` | Suma 1 mes calendario | Enero 31 → Febrero 28/29 |
+
+**Ejemplo práctico:**
+```python
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+
+fecha = datetime(2024, 1, 31, 10, 0, 0)
+
+# Suma 30 días
+fecha + timedelta(days=30)  # → 2024-03-01 10:00:00
+
+# Suma 1 mes
+fecha + relativedelta(months=1)  # → 2024-02-29 10:00:00 (bisiesto)
+```
+
+### Quick Pay con Fechas Correctas
+
+El endpoint `/payments/quick-pay` ahora implementa:
+
+1. **payment_date**: Fecha/hora actual UTC del servidor
+2. **due_date**: Fecha/hora actual + 1 mes (usando relativedelta)
+
+```python
+now = datetime.now(timezone.utc)
+due_date = now + relativedelta(months=1)
+
+payment = payment_service.create_payment(
+    student_id=student_id,
+    amount=amount,
+    due_date=due_date,  # ← 1 mes desde ahora
+    ...
+)
+payment = payment_service.mark_as_paid(payment.id, now)
+```
+
+### Serialización ISO 8601
+
+Todas las fechas se envían en formato ISO 8601:
+```
+2024-03-20T15:30:00+00:00
+```
+
+**Frontend:** JavaScript automáticamente parsea este formato:
+```javascript
+const date = new Date('2024-03-20T15:30:00+00:00');
+date.toLocaleDateString('es-CO');  // → "20/03/2024"
+```
+
+### Casos Borde Manejados
+
+| Fecha inicial | +1 mes | Resultado |
+|---------------|--------|-----------|
+| 2024-01-31 | relativedelta(months=1) | 2024-02-29 (bisiesto) |
+| 2024-03-31 | relativedelta(months=1) | 2024-04-30 |
+| 2024-05-31 | relativedelta(months=1) | 2024-06-30 |
+
+### Por Qué es Importante la Consistencia
+
+1. **Evita desfases de horas**: Usar UTC evita problemas cuando el servidor y cliente están en zonas horarias diferentes
+
+2. **Cálculos precisos**: `relativedelta` respeta el calendario real, no solo suma días
+
+3. **Compatibilidad**: ISO 8601 es un estándar universal que cualquier lenguaje puede parsear
+
+4. **Claridad**: Saber que todas las fechas son UTC elimina ambigüedad
+
+### Cambios Realizados
+
+**Backend:**
+- Modelo `Payment`: `due_date` y `payment_date` ahora son `DateTime(timezone=True)`
+- Schemas Pydantic: Campos de fecha cambiados a `datetime`
+- Controllers: Usan `datetime.now(timezone.utc)` en lugar de `date.today()`
+- Quick Pay: `due_date = now + relativedelta(months=1)`
+
+**Frontend:**
+- `formatDate` recibe strings ISO 8601 y usa `new Date()` para parsear
+- No modifica timezone manualmente, solo formatea lo recibido
+
+## Manejo de Fechas y Consistencia en Pagos
+
+El sistema implementa un manejo consistente de fechas usando **datetime UTC con timezone** en todo el backend.
+
+### Estándar Global
+
+**Reglas aplicadas en TODO el proyecto:**
+
+1. **Usar SIEMPRE datetime con timezone (UTC)**
+   ```python
+   from datetime import datetime, timezone
+   now = datetime.now(timezone.utc)
+   ```
+
+2. **NO usar:**
+   - `date.today()` - no tiene información de hora ni timezone
+   - `datetime.now()` sin timezone - no es aware
+
+3. **Para sumar meses usar relativedelta:**
+   ```python
+   from dateutil.relativedelta import relativedelta
+   due_date = now + relativedelta(months=1)
+   ```
+
+### Diferencia: 30 días vs 1 mes
+
+| Enfoque | Problema | Ejemplo |
+|---------|----------|---------|
+| `timedelta(days=30)` | Ignora calendario | 31 enero → 2 marzo |
+| `relativedelta(months=1)` | Respeta calendario | 31 enero → 28/29 febrero |
+
+**Siempre usar `relativedelta`** para cálculos de meses para respetar el calendario real.
+
+### Cambios en Quick Pay
+
+El endpoint `/payments/quick-pay` ahora:
+
+1. Usa `datetime.now(timezone.utc)` para obtener fecha/hora actual
+2. Calcula `due_date` como `now + relativedelta(months=1)`
+3. Guarda ambos campos como datetime con timezone
+
+**Ejemplo:**
+```python
+now = datetime.now(timezone.utc)  # 2024-03-20T15:30:00+00:00
+due_date = now + relativedelta(months=1)  # 2024-04-20T15:30:00+00:00
+
+payment = create_payment(
+    due_date=due_date,
+    ...
+)
+payment = mark_as_paid(payment.id, now)
+```
+
+### Serialización ISO 8601
+
+Todas las fechas se envían en formato **ISO 8601**:
+```json
+{
+  "payment_date": "2024-03-20T15:30:00+00:00",
+  "due_date": "2024-04-20T15:30:00+00:00"
+}
+```
+
+El frontend puede parsear esto directamente con `new Date()`:
+```javascript
+const date = new Date("2024-03-20T15:30:00+00:00");
+```
+
+### Frontend
+
+La función `formatDate` en el frontend:
+- NO modifica timezone manualmente
+- Solo formatea la fecha recibida
+- Usa `toLocaleDateString()` para mostrar en formato local
+
+```javascript
+function formatDate(dateString) {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-CO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+```
+
+### Por Qué es Importante la Consistencia
+
+1. **Sin desfase de horas**: Todos los datetime tienen timezone UTC
+2. **Cálculos correctos**: Los vencimientos se calculan correctamente
+3. **Comparaciones confiables**: `due_date < now` funciona siempre
+4. **Caso borde manejado**: 31 enero → 28/29 febrero funciona correctamente
+5. **Frontend sin lógica compleja**: Solo formatea lo que recibe
+
+### Endpoints Afectados
+
+Todos los endpoints de pagos ahora usan datetime UTC:
+- `POST /payments/` - Crear pago
+- `POST /payments/quick-pay` - Pago rápido
+- `POST /payments/{id}/mark-paid` - Marcar como pagado
+- `GET /payments/` - Listar pagos
+- `GET /payments/upcoming` - Próximos vencimientos
+- `GET /payments/overdue` - Pagos vencidos
+- `GET /students/upcoming-payments` - Próximos pagos por estudiante
+
 ## Licencia
 
 MIT
