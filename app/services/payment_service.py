@@ -1,8 +1,10 @@
 """Payment service."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
+
+from dateutil.relativedelta import relativedelta
 
 from app.exceptions.custom_exceptions import BusinessError, NotFoundError, ValidationError
 from app.models.payment import Payment, PaymentStatus
@@ -26,7 +28,7 @@ class PaymentService:
         self,
         student_id: UUID,
         amount: Decimal,
-        due_date: date,
+        due_date: datetime,
         idempotency_key: str,
         notes: Optional[str] = None
     ) -> Payment:
@@ -167,7 +169,7 @@ class PaymentService:
     def mark_as_paid(
         self,
         payment_id: UUID,
-        payment_date: Optional[date] = None
+        payment_date: Optional[datetime] = None
     ) -> Payment:
         """Mark payment as paid.
 
@@ -231,7 +233,7 @@ class PaymentService:
         self,
         payment_id: UUID,
         amount: Optional[Decimal] = None,
-        due_date: Optional[date] = None,
+        due_date: Optional[datetime] = None,
         notes: Optional[str] = None
     ) -> Payment:
         """Update payment.

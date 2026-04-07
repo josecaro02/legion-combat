@@ -1056,6 +1056,413 @@ const [searchError, setSearchError] = useState(null);
 - **Error de red**: Se muestra mensaje de error amigable
 - **Token expirado**: Se maneja en el catch del error
 
+## Detalle de Estudiante
+
+Se implementó una página de detalle para visualizar la información completa de un estudiante y su historial de pagos.
+
+### Endpoint Utilizado
+
+- `GET /payments/student/{student_id}` - Obtiene todos los pagos de un estudiante específico
+
+### Navegación
+
+Desde la lista de estudiantes (`/students`), cada fila es clickeable y lleva al detalle del estudiante:
+
+```
+/students/:id
+```
+
+### Componente: StudentDetail.jsx
+
+Archivo: `src/pages/StudentDetail.jsx`
+
+**Funcionalidades:**
+
+- **Información del estudiante**: Nombre, curso, teléfono, dirección, estado y fecha de inscripción
+- **Historial de pagos**: Tabla con montos, estados, fechas de pago y vencimiento
+- **Registro rápido**: Botón "Registrar Pago" que navega a `/payments` con el estudiante preseleccionado
+- **Navegación**: Botón "Volver" para regresar a la lista de estudiantes
+
+### Estructura de Datos Mostrados
+
+**Información del Estudiante:**
+| Campo | Descripción |
+|-------|-------------|
+| Nombre | first_name + last_name |
+| Curso | boxing / kickboxing / both |
+| Teléfono | phone (si existe) |
+| Dirección | address (si existe) |
+| Estado | Activo / Inactivo |
+| Inscripción | enrollment_date |
+
+**Historial de Pagos:**
+| Campo | Descripción |
+|-------|-------------|
+| Monto | amount |
+| Estado | Pagado / Pendiente / Vencido (con badge de color) |
+| Fecha de Pago | payment_date |
+| Fecha de Vencimiento | due_date |
+
+### UX y Estados
+
+**Loading State:**
+- Muestra "Cargando..." centrado mientras se obtienen los datos
+
+**Error State:**
+- Mensaje de error con botón para volver a la lista de estudiantes
+
+**Sin Pagos:**
+- Mensaje: "Este estudiante no tiene pagos registrados."
+
+### Integración con Quick Pay
+
+El botón "Registrar Pago" utiliza la navegación de React Router para pasar el ID del estudiante:
+
+```jsx
+function handleRegisterPayment() {
+  navigate('/payments', {
+    state: { preselectedStudentId: id },
+  });
+}
+```
+
+En `Payments.jsx`, el componente detecta este estado y:
+1. Abre automáticamente el formulario de registro
+2. Preselecciona el estudiante en el dropdown
+3. Limpia el estado de navegación para evitar repeticiones
+
+```jsx
+useEffect(() => {
+  const preselectedStudentId = location.state?.preselectedStudentId;
+  if (preselectedStudentId && token) {
+    setShowForm(true);
+    setFormData(prev => ({ ...prev, student_id: preselectedStudentId }));
+    window.history.replaceState({}, document.title);
+  }
+}, [location.state, token]);
+```
+
+### Cómo Probar
+
+1. **Navegar a estudiantes**: Ir a `/students`
+2. **Seleccionar estudiante**: Hacer clic en cualquier fila de la tabla
+3. **Ver detalle**: Se muestra la información del estudiante y su historial de pagos
+4. **Registrar pago**: Clic en "Registrar Pago" → redirige a `/payments` con el estudiante preseleccionado
+5. **Volver**: Clic en "Volver a Estudiantes" para regresar a la lista
+
+## Detalle de Estudiante
+
+Se implementó una página para visualizar el detalle de un estudiante específico y su historial de pagos.
+
+### Página: StudentDetail.jsx
+
+Archivo: `src/pages/StudentDetail.jsx`
+
+### Cómo Navegar
+
+Desde la lista de estudiantes (`/students`):
+1. Haz clic en cualquier fila de la tabla de estudiantes
+2. Se navegará automáticamente a `/students/{id}`
+
+Desde cualquier otra página:
+1. Navegar directamente a `/students/{id}` reemplazando `{id}` con el UUID del estudiante
+
+### Información Mostrada
+
+#### Información del Estudiante
+- **Nombre completo**: Nombre y apellido del estudiante
+- **Curso**: El curso al que está inscrito (boxeo, kickboxing, ambos)
+- **Teléfono**: Número de contacto (si existe)
+- **Dirección**: Dirección registrada (si existe)
+- **Estado**: Activo o inactivo
+- **Fecha de Inscripción**: Fecha en que se registró
+
+#### Historial de Pagos
+Tabla con los pagos del estudiante mostrando:
+- **Monto**: Valor del pago en pesos chilenos
+- **Estado**: Pagado (verde), Pendiente (amarillo), Vencido (rojo)
+- **Fecha de Pago**: Cuándo se realizó el pago
+- **Fecha de Vencimiento**: Fecha límite del pago
+
+### Endpoint Utilizado
+
+```
+GET /payments/student/{student_id}
+```
+
+**Response**:
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "amount": 25000,
+      "status": "paid",
+      "payment_date": "2024-03-15",
+      "due_date": "2024-03-31"
+    }
+  ],
+  "total": 5,
+  "pages": 1,
+  "current_page": 1
+}
+```
+
+### Estados de UI
+
+- **Cargando**: Muestra "Cargando..." mientras se obtienen los datos del estudiante y sus pagos
+- **Error**: Muestra mensaje de error si falla la carga con botón para volver a la lista
+- **Sin pagos**: Muestra mensaje "Este estudiante no tiene pagos registrados." cuando el estudiante no tiene pagos
+
+### Funcionalidad Bonus: Registrar Pago
+
+El botón **"Registrar Pago"** en la esquina superior derecha permite:
+1. Navegar a la página de pagos (`/payments`)
+2. Abrir automáticamente el formulario de registro
+3. Preseleccionar al estudiante actual en el dropdown
+
+**Flujo de navegación**:
+```javascript
+navigate('/payments', {
+  state: { preselectedStudentId: id },
+});
+```
+
+### Cómo Probar
+
+1. Ir a la página de estudiantes (`/students`)
+2. Hacer clic en cualquier estudiante de la tabla
+3. Verificar que se muestra:
+   - Información completa del estudiante
+   - Tabla con el historial de pagos
+   - Mensaje si el estudiante no tiene pagos
+4. (Opcional) Clic en "Registrar Pago" para ir a la página de pagos con el estudiante preseleccionado
+
+### Componentes Utilizados
+
+| Componente | Descripción |
+|-------------|-------------|
+| `useParams` | Obtiene el `id` del estudiante de la URL |
+| `useNavigate` | Navega a la lista de estudiantes o a pagos |
+| `getStudent` | Obtiene datos del estudiante por ID |
+| `getStudentPayments` | Obtiene los pagos del estudiante |
+
+## Manejo de Fechas y Consistencia en Pagos
+
+El sistema implementa un manejo estandarizado de fechas para garantizar consistencia entre backend y frontend, evitando problemas de zonas horarias y formatos.
+
+### Estándar Global
+
+Todas las fechas en el sistema siguen estas reglas:
+
+1. **Usar SIEMPRE datetime con timezone (UTC)**
+   ```python
+   from datetime import datetime, timezone
+   now = datetime.now(timezone.utc)
+   ```
+
+2. **NO usar:**
+   - `date.today()` - No tiene información de hora ni timezone
+   - `datetime.now()` sin timezone - Puede causar inconsistencias
+
+3. **Para sumar meses usar relativedelta:**
+   ```python
+   from dateutil.relativedelta import relativedelta
+   due_date = now + relativedelta(months=1)
+   ```
+
+### Diferencia: 30 días vs 1 mes
+
+Es importante entender la diferencia:
+
+| Método | Resultado | Casos borde |
+|--------|-----------|-------------|
+| `timedelta(days=30)` | Simplemente suma 30 días | Enero 31 → Marzo 2 |
+| `relativedelta(months=1)` | Suma 1 mes calendario | Enero 31 → Febrero 28/29 |
+
+**Ejemplo práctico:**
+```python
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+
+fecha = datetime(2024, 1, 31, 10, 0, 0)
+
+# Suma 30 días
+fecha + timedelta(days=30)  # → 2024-03-01 10:00:00
+
+# Suma 1 mes
+fecha + relativedelta(months=1)  # → 2024-02-29 10:00:00 (bisiesto)
+```
+
+### Quick Pay con Fechas Correctas
+
+El endpoint `/payments/quick-pay` ahora implementa:
+
+1. **payment_date**: Fecha/hora actual UTC del servidor
+2. **due_date**: Fecha/hora actual + 1 mes (usando relativedelta)
+
+```python
+now = datetime.now(timezone.utc)
+due_date = now + relativedelta(months=1)
+
+payment = payment_service.create_payment(
+    student_id=student_id,
+    amount=amount,
+    due_date=due_date,  # ← 1 mes desde ahora
+    ...
+)
+payment = payment_service.mark_as_paid(payment.id, now)
+```
+
+### Serialización ISO 8601
+
+Todas las fechas se envían en formato ISO 8601:
+```
+2024-03-20T15:30:00+00:00
+```
+
+**Frontend:** JavaScript automáticamente parsea este formato:
+```javascript
+const date = new Date('2024-03-20T15:30:00+00:00');
+date.toLocaleDateString('es-CO');  // → "20/03/2024"
+```
+
+### Casos Borde Manejados
+
+| Fecha inicial | +1 mes | Resultado |
+|---------------|--------|-----------|
+| 2024-01-31 | relativedelta(months=1) | 2024-02-29 (bisiesto) |
+| 2024-03-31 | relativedelta(months=1) | 2024-04-30 |
+| 2024-05-31 | relativedelta(months=1) | 2024-06-30 |
+
+### Por Qué es Importante la Consistencia
+
+1. **Evita desfases de horas**: Usar UTC evita problemas cuando el servidor y cliente están en zonas horarias diferentes
+
+2. **Cálculos precisos**: `relativedelta` respeta el calendario real, no solo suma días
+
+3. **Compatibilidad**: ISO 8601 es un estándar universal que cualquier lenguaje puede parsear
+
+4. **Claridad**: Saber que todas las fechas son UTC elimina ambigüedad
+
+### Cambios Realizados
+
+**Backend:**
+- Modelo `Payment`: `due_date` y `payment_date` ahora son `DateTime(timezone=True)`
+- Schemas Pydantic: Campos de fecha cambiados a `datetime`
+- Controllers: Usan `datetime.now(timezone.utc)` en lugar de `date.today()`
+- Quick Pay: `due_date = now + relativedelta(months=1)`
+
+**Frontend:**
+- `formatDate` recibe strings ISO 8601 y usa `new Date()` para parsear
+- No modifica timezone manualmente, solo formatea lo recibido
+
+## Manejo de Fechas y Consistencia en Pagos
+
+El sistema implementa un manejo consistente de fechas usando **datetime UTC con timezone** en todo el backend.
+
+### Estándar Global
+
+**Reglas aplicadas en TODO el proyecto:**
+
+1. **Usar SIEMPRE datetime con timezone (UTC)**
+   ```python
+   from datetime import datetime, timezone
+   now = datetime.now(timezone.utc)
+   ```
+
+2. **NO usar:**
+   - `date.today()` - no tiene información de hora ni timezone
+   - `datetime.now()` sin timezone - no es aware
+
+3. **Para sumar meses usar relativedelta:**
+   ```python
+   from dateutil.relativedelta import relativedelta
+   due_date = now + relativedelta(months=1)
+   ```
+
+### Diferencia: 30 días vs 1 mes
+
+| Enfoque | Problema | Ejemplo |
+|---------|----------|---------|
+| `timedelta(days=30)` | Ignora calendario | 31 enero → 2 marzo |
+| `relativedelta(months=1)` | Respeta calendario | 31 enero → 28/29 febrero |
+
+**Siempre usar `relativedelta`** para cálculos de meses para respetar el calendario real.
+
+### Cambios en Quick Pay
+
+El endpoint `/payments/quick-pay` ahora:
+
+1. Usa `datetime.now(timezone.utc)` para obtener fecha/hora actual
+2. Calcula `due_date` como `now + relativedelta(months=1)`
+3. Guarda ambos campos como datetime con timezone
+
+**Ejemplo:**
+```python
+now = datetime.now(timezone.utc)  # 2024-03-20T15:30:00+00:00
+due_date = now + relativedelta(months=1)  # 2024-04-20T15:30:00+00:00
+
+payment = create_payment(
+    due_date=due_date,
+    ...
+)
+payment = mark_as_paid(payment.id, now)
+```
+
+### Serialización ISO 8601
+
+Todas las fechas se envían en formato **ISO 8601**:
+```json
+{
+  "payment_date": "2024-03-20T15:30:00+00:00",
+  "due_date": "2024-04-20T15:30:00+00:00"
+}
+```
+
+El frontend puede parsear esto directamente con `new Date()`:
+```javascript
+const date = new Date("2024-03-20T15:30:00+00:00");
+```
+
+### Frontend
+
+La función `formatDate` en el frontend:
+- NO modifica timezone manualmente
+- Solo formatea la fecha recibida
+- Usa `toLocaleDateString()` para mostrar en formato local
+
+```javascript
+function formatDate(dateString) {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-CO', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+```
+
+### Por Qué es Importante la Consistencia
+
+1. **Sin desfase de horas**: Todos los datetime tienen timezone UTC
+2. **Cálculos correctos**: Los vencimientos se calculan correctamente
+3. **Comparaciones confiables**: `due_date < now` funciona siempre
+4. **Caso borde manejado**: 31 enero → 28/29 febrero funciona correctamente
+5. **Frontend sin lógica compleja**: Solo formatea lo que recibe
+
+### Endpoints Afectados
+
+Todos los endpoints de pagos ahora usan datetime UTC:
+- `POST /payments/` - Crear pago
+- `POST /payments/quick-pay` - Pago rápido
+- `POST /payments/{id}/mark-paid` - Marcar como pagado
+- `GET /payments/` - Listar pagos
+- `GET /payments/upcoming` - Próximos vencimientos
+- `GET /payments/overdue` - Pagos vencidos
+- `GET /students/upcoming-payments` - Próximos pagos por estudiante
+
 ## Licencia
 
 MIT

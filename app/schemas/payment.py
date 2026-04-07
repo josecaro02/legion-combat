@@ -1,5 +1,5 @@
 """Payment schemas."""
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
@@ -12,7 +12,7 @@ class PaymentCreate(BaseModel):
     """Payment creation schema."""
     student_id: UUID
     amount: AmountDecimal
-    due_date: date
+    due_date: datetime
     idempotency_key: str = Field(..., min_length=10, max_length=64)
     notes: Optional[str] = None
 
@@ -20,7 +20,7 @@ class PaymentCreate(BaseModel):
 class PaymentUpdate(BaseModel):
     """Payment update schema."""
     amount: Optional[AmountDecimal] = None
-    due_date: Optional[date] = None
+    due_date: Optional[datetime] = None
     notes: Optional[str] = None
 
 
@@ -32,8 +32,8 @@ class PaymentResponse(BaseModel):
     student_id: UUID
     amount: Decimal
     status: str
-    payment_date: Optional[date]
-    due_date: date
+    payment_date: Optional[datetime]
+    due_date: datetime
     notes: Optional[str]
     created_at: datetime
 

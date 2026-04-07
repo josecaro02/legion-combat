@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { getStudents, createStudent, searchStudents } from '../api/students.api';
@@ -10,6 +11,7 @@ import { getStudents, createStudent, searchStudents } from '../api/students.api'
  * Incluye debounce para optimizar las llamadas a la API.
  */
 function Students() {
+  const navigate = useNavigate();
   const { user, token } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,6 +134,13 @@ function Students() {
   }
 
   /**
+   * Navega al detalle del estudiante
+   */
+  function handleStudentClick(studentId) {
+    navigate(`/students/${studentId}`);
+  }
+
+  /**
    * Limpia el campo de búsqueda y vuelve a la lista original
    */
   function clearSearch() {
@@ -141,8 +150,13 @@ function Students() {
   }
 
   /**
-   * Determina qué estudiantes mostrar
-   * Si hay resultados de búsqueda, los muestra; si no, muestra la lista original
+   * Navega al detalle del estudiante
+   */
+  function handleStudentClick(studentId) {
+    navigate(`/students/${studentId}`);
+  }
+
+  /* Si hay resultados de búsqueda, los muestra; si no, muestra la lista original
    */
   const displayedStudents = searchResults !== null ? searchResults : students;
   const isSearching = searchTerm.trim().length >= 2;
@@ -393,7 +407,11 @@ function Students() {
                 </tr>
               ) : (
                 displayedStudents.map(student => (
-                  <tr key={student.id} className="hover:bg-gray-50">
+                  <tr
+                    key={student.id}
+                    onClick={() => handleStudentClick(student.id)}
+                    className="cursor-pointer hover:bg-gray-50"
+                  >
                     <td className="px-4 py-3 text-sm text-gray-900">
                       {student.first_name}
                     </td>

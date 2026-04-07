@@ -1,5 +1,5 @@
 """Student service."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -237,8 +237,8 @@ class StudentService:
         """
         from sqlalchemy import and_, text
 
-        today = date.today()
-        target_max = today + timedelta(days=days)
+        now = datetime.now(timezone.utc)
+        target_max = now + timedelta(days=days)
         
         # Subquery: Get the latest payment_date for each student with status='paid'
         # This is more efficient than querying payments separately for each student
@@ -278,10 +278,10 @@ class StudentService:
                 Student.is_active == True,
                 # Calculate due_soon_date = payment_date + 1 month
                 # Filter: today <= due_soon_date <= today + days
-                text("(payment_date + INTERVAL '1 month') >= :today"),
+                text("(payment_date + INTERVAL '1 month') >= :now"),
                 text("(payment_date + INTERVAL '1 month') <= :target_max")
             )
-            .params(today=today, target_max=target_max)
+            .params(now=now, target_max=target_max)
             .order_by(text("payment_date + INTERVAL '1 month'"))  # Order by due_soon_date
         )
 
@@ -352,8 +352,8 @@ class StudentService:
         """
         from sqlalchemy import func
 
-        today = date.today()
-        target_date = today + timedelta(days=days)
+        now = datetime.now(timezone.utc)
+        target_date = now + timedelta(days=days)
 
         # Subquery: Get the latest payment_date for each student
         # Only considers payments with status='paid' and non-null payment_date

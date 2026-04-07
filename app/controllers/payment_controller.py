@@ -360,7 +360,8 @@ def quick_pay():
       401:
         description: Unauthorized
     """
-    from datetime import date
+    from datetime import datetime, timezone
+    from dateutil.relativedelta import relativedelta
     from uuid import uuid4
     from decimal import Decimal
 
@@ -392,20 +393,22 @@ def quick_pay():
             'message': 'amount must be a positive number'
         }), 400
 
-    today = date.today()
+    # Usar datetime UTC con timezone
+    now = datetime.now(timezone.utc)
+    due_date = now + relativedelta(months=1)
 
     try:
-        # 1. Create payment with due_date = today, status = pending
+        # 1. Create payment with due_date = 1 mes desde ahora, status = pending
         payment = payment_service.create_payment(
             student_id=UUID(student_id),
             amount=amount,
-            due_date=today,
+            due_date=due_date,
             idempotency_key=str(uuid4()),
             notes=data.get('notes')
         )
-
-        # 2. Mark as paid
-        payment = payment_service.mark_as_paid(payment.id, today)
+        print(now)
+        # 2. Mark as paid con payment_date = now
+        payment = payment_service.mark_as_paid(payment.id, now)
 
         return jsonify(PaymentResponse.from_orm(payment).model_dump()), 201
     except Exception as e:
@@ -563,12 +566,17 @@ def mark_payment_paid(payment_id: UUID):
         description: Payment not found
     """
     data = request.get_json() or {}
-    payment_date = data.get('payment_date')
+    payment_date_str = data.get('payment_date')
 
     try:
-        from datetime import date
-        if payment_date:
-            payment_date = date.fromisoformat(payment_date)
+        payment_date = None
+        if payment_date_str:
+            from datetime import datetime, timezone
+            # Parsear como datetime y asegurar que tenga timezone
+            if isinstance(payment_date_str, str):
+                payment_date = datetime.fromisoformat(payment_date_str.replace('Z', '+00:00'))
+            else:
+                payment_date = payment_date_str
 
         payment = payment_service.mark_as_paid(payment_id, payment_date)
         return jsonify(PaymentResponse.from_orm(payment).model_dump()), 200
