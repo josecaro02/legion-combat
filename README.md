@@ -119,6 +119,99 @@ Y actualiza tu `.env`:
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/legion_combat_dev
 ```
 
+## Migraciones de Base de Datos (Alembic)
+
+Este proyecto usa **Alembic** para gestionar migraciones de base de datos con SQLAlchemy.
+
+### Configuración inicial (ya realizada)
+
+La configuración de Alembic ya está completa:
+- Archivo `alembic.ini` configurado
+- `migrations/env.py` importa los modelos automáticamente
+- Las migraciones se guardan en `migrations/versions/`
+
+### Comandos básicos
+
+```bash
+# Ver estado actual de migraciones
+alembic current
+
+# Crear nueva migración (después de modificar modelos)
+alembic revision --autogenerate -m "descripcion del cambio"
+
+# Aplicar migraciones pendientes
+alembic upgrade head
+
+# Revertir última migración (cuidado: perderás datos de las tablas afectadas)
+alembic downgrade -1
+
+# Revertir a versión específica
+alembic downgrade <revision_id>
+
+# Ver historial de migraciones
+alembic history
+```
+
+### Flujo de trabajo para cambios en modelos
+
+1. **Modificar modelos** en `app/models/`
+
+2. **Crear migración**:
+   ```bash
+   alembic revision --autogenerate -m "agregar columna telefono a estudiantes"
+   ```
+
+3. **Revisar el script generado** en `migrations/versions/`
+   - Verificar que los cambios sean correctos
+   - Revisar especialmente operaciones que puedan causar pérdida de datos
+
+4. **Aplicar migración**:
+   ```bash
+   alembic upgrade head
+   ```
+
+### Flujo de trabajo para nuevo desarrollador
+
+Si clonas el proyecto por primera vez:
+
+```bash
+# 1. Crear base de datos
+createdb legion_combat_dev
+
+# 2. Aplicar todas las migraciones
+alembic upgrade head
+
+# 3. La aplicación ya está lista para usar
+python run.py
+```
+
+### Buenas prácticas
+
+- **Siempre revisa** los scripts de migración autogenerados antes de aplicarlos
+- **Nunca** uses `db.drop_all()` en producción
+- **Nunca** modifiques migraciones ya aplicadas en producción
+- Mantén las migraciones **pequeñas y enfocadas** (una lógica de cambio por migración)
+- En desarrollo, si necesitas limpiar todo:
+  ```bash
+  # Peligro: solo en desarrollo con datos de prueba
+  alembic downgrade base  # Revertir todo
+  alembic upgrade head  # Aplicar de nuevo
+  ```
+
+### Troubleshooting
+
+**Error: `type "xxx" already exists`**
+- Los tipos ENUM de PostgreSQL no se eliminaron correctamente
+- Solución: eliminar manualmente los tipos ENUM del schema público
+
+**Error: `relation "xxx" already exists`**
+- Intentaste crear tablas que ya existen
+- Solución: `alembic stamp head` para marcar la BD como actualizada
+
+**Alembic no detecta cambios**
+- Asegúrate de importar el modelo en `app/models/__init__.py`
+- Verifica que el modelo herede de `Base` (de `app.extensions`)
+
 ### Crear usuario Owner inicial
 
 ```python
