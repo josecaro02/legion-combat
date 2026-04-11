@@ -34,6 +34,9 @@ def create_app(config: Config = None) -> Flask:
     # Initialize extensions
     db.init_app(app)
 
+    from app.commands import create_owner
+    app.cli.add_command(create_owner)
+
     # Register blueprints
     register_blueprints(app)
 
@@ -42,10 +45,6 @@ def create_app(config: Config = None) -> Flask:
 
     # Register error handlers
     register_error_handlers(app)
-
-    # Create tables (for development only - use migrations in production)
-    with app.app_context():
-        db.create_all()
 
     return app
 
