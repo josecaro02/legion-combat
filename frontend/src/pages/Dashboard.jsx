@@ -3,6 +3,8 @@ import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '../utils/permissions';
 import { authGet } from '../api/client';
+import { getUpcomingPayments } from '../api/students.api';
+import UpcomingPaymentsList from '../components/UpcomingPaymentsList';
 
 /**
  * Dashboard - Main view after login
@@ -24,6 +26,12 @@ function Dashboard() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Upcoming payments state
+  const [upcomingData, setUpcomingData] = useState(null);
+  const [upcomingLoading, setUpcomingLoading] = useState(false);
+  const [upcomingError, setUpcomingError] = useState(null);
+  const [upcomingShowList, setUpcomingShowList] = useState(false);
 
   // Fetch data on component mount
   useEffect(() => {
@@ -76,6 +84,21 @@ function Dashboard() {
   };
 
   const lastPaymentDate = getLastPaymentDate();
+
+  async function handleUpcomingPayments() {
+    if (!token) return;
+    setUpcomingLoading(true);
+    setUpcomingError(null);
+    try {
+      const result = await getUpcomingPayments(token,30);
+      setUpcomingData(result);
+      setUpcomingShowList(true);
+    } catch (err) {
+      setUpcomingError(err.message || 'Error al cargar próximos pagos');
+    } finally {
+      setUpcomingLoading(false);
+    }
+  }
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -179,6 +202,34 @@ function Dashboard() {
               Registrar Pago
             </button>
           </div>
+        </section>
+      )}
+
+      {/* Upcoming Payments section - Owner and Professor */}
+      {canViewPayments && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-lg font-semibold text-gray-700">Próximos Pagos</h2>
+          <div className="mb-4">
+            <button
+              onClick={handleUpcomingPayments}
+              disabled={upcomingLoading}
+              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+            >
+              {upcomingLoading ? 'Cargando...' : 'Ver próximos pagos'}
+            </button>
+          </div>
+
+          {upcomingLoading && (
+            <p className="text-gray-600">Cargando...</p>
+          )}
+
+          {upcomingError && (
+            <p className="text-red-700">{upcomingError}</p>
+          )}
+
+          {upcomingShowList && upcomingData && (
+            <UpcomingPaymentsList items={upcomingData.items} />
+          )}
         </section>
       )}
 

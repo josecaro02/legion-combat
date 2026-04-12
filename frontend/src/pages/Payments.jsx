@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { quickPay, getPayments } from '../api/payments.api';
-import { getStudents } from '../api/students.api';
+import { getStudents, getUpcomingPayments } from '../api/students.api';
+import UpcomingPaymentsList from '../components/UpcomingPaymentsList';
 
 /**
  * Payments Component
@@ -30,6 +31,12 @@ function Payments() {
   const [formLoading, setFormLoading] = useState(false);
   const [lastPayment, setLastPayment] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Upcoming payments state
+  const [upcomingData, setUpcomingData] = useState(null);
+  const [upcomingLoading, setUpcomingLoading] = useState(false);
+  const [upcomingError, setUpcomingError] = useState(null);
+  const [upcomingShowList, setUpcomingShowList] = useState(false);
 
   const canView = hasPermission(user, 'canViewPayments');
   const canCreate = hasPermission(user, 'canCreatePayment');
@@ -187,6 +194,21 @@ function Payments() {
     const hasStudent = formData.student_id && formData.student_id.trim() !== '';
     const hasAmount = formData.amount && parseFloat(formData.amount) > 0;
     return hasStudent && hasAmount && !formLoading;
+  }
+
+  async function handleUpcomingPayments() {
+    if (!token) return;
+    setUpcomingLoading(true);
+    setUpcomingError(null);
+    try {
+      const result = await getUpcomingPayments(token);
+      setUpcomingData(result);
+      setUpcomingShowList(true);
+    } catch (err) {
+      setUpcomingError(err.message || 'Error al cargar próximos pagos');
+    } finally {
+      setUpcomingLoading(false);
+    }
   }
 
   /**
@@ -378,6 +400,29 @@ function Payments() {
           </p>
         </div>
       )}
+
+      {/* Upcoming Payments section */}
+      <div className="mb-6">
+        <button
+          onClick={handleUpcomingPayments}
+          disabled={upcomingLoading}
+          className="rounded-md bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+        >
+          {upcomingLoading ? 'Cargando...' : 'Pagos próximos a vencer'}
+        </button>
+
+        {upcomingLoading && (
+          <p className="mt-4 text-gray-600">Cargando...</p>
+        )}
+
+        {upcomingError && (
+          <p className="mt-4 text-red-700">{upcomingError}</p>
+        )}
+
+        {upcomingShowList && upcomingData && (
+          <UpcomingPaymentsList items={upcomingData.items} />
+        )}
+      </div>
 
       <div className="rounded-lg bg-white shadow">
         <div className="overflow-x-auto">
