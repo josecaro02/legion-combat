@@ -1,39 +1,29 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../auth/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { hasPermission } from '../utils/permissions';
-import { authGet } from '../api/client';
-import { getUpcomingPayments } from '../api/students.api';
-import UpcomingPaymentsList from '../components/UpcomingPaymentsList';
+import { useState, useEffect } from "react";
+import { useAuth } from "../auth/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { hasPermission } from "../utils/permissions";
+import { authGet } from "../api/client";
+import { getUpcomingPayments } from "../api/students.api";
+import UpcomingPaymentsList from "../components/UpcomingPaymentsList";
 
-/**
- * Dashboard - Main view after login
- *
- * Shows different sections based on user permissions.
- * Uses centralized permission system for role checks.
- * Connected to real backend data.
- */
 function Dashboard() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
-  const canViewStudents = hasPermission(user, 'canViewStudents');
-  const canViewPayments = hasPermission(user, 'canViewPayments');
-  const canViewReports = hasPermission(user, 'canViewReports');
+  const canViewStudents = hasPermission(user, "canViewStudents");
+  const canViewPayments = hasPermission(user, "canViewPayments");
+  const canViewReports = hasPermission(user, "canViewReports");
 
-  // State for dashboard data
   const [students, setStudents] = useState([]);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Upcoming payments state
   const [upcomingData, setUpcomingData] = useState(null);
   const [upcomingLoading, setUpcomingLoading] = useState(false);
   const [upcomingError, setUpcomingError] = useState(null);
   const [upcomingShowList, setUpcomingShowList] = useState(false);
 
-  // Fetch data on component mount
   useEffect(() => {
     async function fetchDashboardData() {
       if (!token) return;
@@ -42,21 +32,17 @@ function Dashboard() {
       setError(null);
 
       try {
-        // Fetch students data
         if (canViewStudents) {
-          const studentsData = await authGet('/students/', token);
-          // Handle both paginated and direct array responses
+          const studentsData = await authGet("/students/", token);
           setStudents(studentsData.items || studentsData || []);
         }
 
-        // Fetch payments data
         if (canViewPayments) {
-          const paymentsData = await authGet('/payments/', token);
-          // Handle both paginated and direct array responses
+          const paymentsData = await authGet("/payments/", token);
           setPayments(paymentsData.items || paymentsData || []);
         }
       } catch (err) {
-        setError(err.message || 'Error al cargar los datos');
+        setError(err.message || "Error al cargar los datos");
       } finally {
         setLoading(false);
       }
@@ -65,19 +51,16 @@ function Dashboard() {
     fetchDashboardData();
   }, [token, canViewStudents, canViewPayments]);
 
-  // Calculate metrics
   const totalStudents = students.length;
   const totalPayments = payments.length;
 
-  // Get last payment date (most recent payment_date)
   const getLastPaymentDate = () => {
     if (!payments || payments.length === 0) return null;
-
-    const paidPayments = payments.filter(p => p.payment_date);
+    const paidPayments = payments.filter((p) => p.payment_date);
     if (paidPayments.length === 0) return null;
 
     const sorted = paidPayments.sort(
-      (a, b) => new Date(b.payment_date) - new Date(a.payment_date)
+      (a, b) => new Date(b.payment_date) - new Date(a.payment_date),
     );
 
     return sorted[0].payment_date;
@@ -90,163 +73,177 @@ function Dashboard() {
     setUpcomingLoading(true);
     setUpcomingError(null);
     try {
-      const result = await getUpcomingPayments(token,30);
+      const result = await getUpcomingPayments(token, 30);
       setUpcomingData(result);
       setUpcomingShowList(true);
     } catch (err) {
-      setUpcomingError(err.message || 'Error al cargar próximos pagos');
+      setUpcomingError(err.message || "Error al cargar próximos pagos");
     } finally {
       setUpcomingLoading(false);
     }
   }
 
-  // Format date for display
   const formatDate = (dateString) => {
-    if (!dateString) return 'Sin registros';
+    if (!dateString) return "Sin registros";
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-CL', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
+    return date.toLocaleDateString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   };
 
-  // Loading state
   if (loading) {
     return (
-      <div>
-        <h1 className="mb-2 text-2xl font-bold text-gray-800">Dashboard</h1>
+      <div className="min-h-screen bg-bg text-text p-6">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className="flex h-64 items-center justify-center">
-          <p className="text-lg text-gray-600">Cargando...</p>
+          <p className="text-muted">Cargando...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <h1 className="mb-2 text-2xl font-bold text-gray-800">Dashboard</h1>
+    <div className="relative min-h-screen text-text p-6 overflow-hidden">
+      <div className="relative z-10">
+        <h1 className="mb-2 text-3xl font-semibold">Dashboard</h1>
 
-      <p className="mb-6 text-gray-600">
-        Bienvenido, <span className="font-semibold">{user?.email}</span>
-        {' '}
-        <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-          {user?.role}
-        </span>
-      </p>
+        <p className="mb-8 text-muted">
+          Bienvenido,{" "}
+          <span className="text-white font-semibold">{user?.email}</span>{" "}
+          <span className="border border-border px-2 py-1 text-xs rounded-full">
+            {user?.role}
+          </span>
+        </p>
 
-      {/* Error message */}
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-800">
-          {error}
-        </div>
-      )}
-
-      {/* Common section for both roles */}
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold text-gray-700">Estudiantes</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg bg-white p-4 shadow">
-            <p className="text-sm text-gray-500">Total Estudiantes</p>
-            <p className="text-2xl font-bold text-blue-600">
-              {totalStudents > 0 ? totalStudents : '--'}
-            </p>
+        {error && (
+          <div className="mb-6 rounded-md border border-red-700 bg-red-900/20 p-4 text-red-400">
+            {error}
           </div>
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => navigate("/students")}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-              Ver Estudiantes
-            </button>
-          </div>
-        </div>
-      </section>
+        )}
 
-      {/* Payments section - Owner and Professor */}
-      {canViewPayments && (
-        <section className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold text-gray-700">Pagos</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Total Pagos</p>
-              <p className="text-2xl font-bold text-green-600">
-                {totalPayments > 0 ? totalPayments : '--'}
-              </p>
-            </div>
-            <div className="rounded-lg bg-white p-4 shadow">
-              <p className="text-sm text-gray-500">Ultimo Pago</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {lastPaymentDate ? formatDate(lastPaymentDate) : '--'}
-              </p>
-            </div>
-            <div className="flex items-center justify-end">
+        <div className="grid  gap-6 md:grid-cols-2">
+          <section className="mb-8">
+            <h2 className="font-legion uppercase tracking-wide text-sm text-muted mb-3">
+              Estudiantes
+            </h2>
+            <div className="bg-card/80 backdrop-blur-sm border border-border rounded-md p-5 shadow-soft flex justify-between">
+              <div>
+                <p className="text-md text-muted mb-2">Total Estudiantes</p>
+                <p className="text-2xl font-semibold text-white">
+                  {totalStudents > 0 ? totalStudents : "--"}
+                </p>
+              </div>
+
               <button
-                onClick={() => navigate("/payments")}
-                className="rounded-md bg-yellow-600 px-4 py-2 text-white hover:bg-yellow-700">
-                Ver Pagos
+                onClick={() => navigate("/students")}
+                className="text-lg text-gold hover:text-goldLight transition hover:scale-125 transition-transform duration-300"
+              >
+                Ver →
               </button>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
 
-      {/* Create Payment section - Owner and Professor */}
-      {hasPermission(user, 'canCreatePayment') && (
-        <section className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold text-gray-700">Registrar Pago</h2>
-          <div className="rounded-lg bg-white p-6 shadow">
-            <p className="mb-4 text-gray-600">
-              Registra un nuevo pago para un estudiante.
-            </p>
-            <button className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700">
-              Registrar Pago
-            </button>
-          </div>
-        </section>
-      )}
+          {canViewPayments && (
+            <section className="mb-8">
+              <h2 className="font-legion uppercase tracking-wide text-sm text-muted mb-3">
+                Pagos
+              </h2>
 
-      {/* Upcoming Payments section - Owner and Professor */}
-      {canViewPayments && (
-        <section className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold text-gray-700">Próximos Pagos</h2>
-          <div className="mb-4">
-            <button
-              onClick={handleUpcomingPayments}
-              disabled={upcomingLoading}
-              className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-            >
-              {upcomingLoading ? 'Cargando...' : 'Ver próximos pagos'}
-            </button>
-          </div>
+              <div className="bg-card/80 backdrop-blur-sm border border-border rounded-md p-5 shadow-soft relative">
+                <div className="flex items-center">
+                  <div className="flex-1">
+                    <p className="text-md text-muted mb-2 tracking-wider">
+                      Total Pagos
+                    </p>
+                    <p className="text-2xl font-bold text-white">
+                      {totalPayments > 0 ? totalPayments : "0"}
+                    </p>
+                  </div>
 
-          {upcomingLoading && (
-            <p className="text-gray-600">Cargando...</p>
-          )}
+                  <div className="w-[1px] h-12 bg-border mx-6" />
 
-          {upcomingError && (
-            <p className="text-red-700">{upcomingError}</p>
-          )}
-
-          {upcomingShowList && upcomingData && (
-            <UpcomingPaymentsList items={upcomingData.items} />
-          )}
-        </section>
-      )}
-
-      {/* Quick actions - visible to both */}
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-gray-700">Acciones Rápidas</h2>
-        <div className="flex flex-wrap gap-3">
-          <button className="rounded-md border border-gray-300 bg-white px-4 py-2 hover:bg-gray-50">
-            Buscar Estudiante
-          </button>
-          {canViewReports && (
-            <button className="rounded-md border border-gray-300 bg-white px-4 py-2 hover:bg-gray-50">
-              Generar Reporte
-            </button>
+                  <div className="flex-[1.5]">
+                    <p className="text-md text-muted mb-2 tracking-wider">
+                      Último Pago
+                    </p>
+                    <p className="text-2xl font-semibold text-gold tracking-tight">
+                      {lastPaymentDate ? formatDate(lastPaymentDate) : "--"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate("/payments")}
+                    className="text-lg text-gold hover:text-goldLight transition hover:scale-125 transition-transform duration-300"
+                  >
+                    Ver →
+                  </button>
+                </div>
+              </div>
+            </section>
           )}
         </div>
-      </section>
+        {hasPermission(user, "canCreatePayment") && (
+          <section className="mb-8">
+            <h2 className="font-legion uppercase tracking-wide text-sm text-muted mb-3">
+              Registrar Pago
+            </h2>
+
+            <div className="bg-card/80 backdrop-blur-sm border border-border rounded-md p-6 shadow-soft">
+              <p className="mb-4 text-muted">
+                Registra un nuevo pago para un estudiante.
+              </p>
+
+              <button className="font-legion uppercase tracking-wide px-6 py-2 border border-gold text-gold rounded-sm hover:bg-gold hover:text-black transition duration-200">
+                Registrar Pago
+              </button>
+            </div>
+          </section>
+        )}
+
+        {canViewPayments && (
+          <section className="mb-8">
+            <h2 className="font-legion uppercase tracking-wide text-sm text-muted mb-3">
+              Próximos Pagos
+            </h2>
+
+            <div className="mb-4">
+              <button
+                onClick={handleUpcomingPayments}
+                disabled={upcomingLoading}
+                className="text-sm text-muted hover:text-gold transition disabled:text-gray-600"
+              >
+                {upcomingLoading ? "Cargando..." : "Ver →"}
+              </button>
+            </div>
+
+            {upcomingLoading && <p className="text-muted">Cargando...</p>}
+            {upcomingError && <p className="text-red-400">{upcomingError}</p>}
+
+            {upcomingShowList && upcomingData && (
+              <UpcomingPaymentsList items={upcomingData.items} />
+            )}
+          </section>
+        )}
+
+        <section>
+          <h2 className="font-legion uppercase tracking-wide text-sm text-muted mb-3">
+            Acciones Rápidas
+          </h2>
+
+          <div className="flex gap-6">
+            <button className="text-sm text-muted hover:text-gold transition">
+              Buscar Estudiante
+            </button>
+
+            {canViewReports && (
+              <button className="text-sm text-muted hover:text-gold transition">
+                Generar Reporte
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
