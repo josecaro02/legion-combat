@@ -77,3 +77,13 @@ export async function deactivateStudent(token, studentId) {
 export async function activateStudent(token, studentId) {
   return authPost(`${ENDPOINT}/${studentId}/activate`, {}, token);
 }
+
+/**
+ * Get students with upcoming payments due within N days
+ * @param {string} token - JWT token
+ * @param {number} days - Number of days to look ahead (default: 5)
+ * @returns {Promise<Array>}
+ */
+export async function getUpcomingPayments(token, days = 5) {
+  return authGet(`${ENDPOINT}/upcoming-payments?days=${days}`, token);
+}
