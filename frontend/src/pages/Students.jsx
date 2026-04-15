@@ -149,42 +149,39 @@ function Students() {
     setSearchError(null);
   }
 
-  /**
-   * Navega al detalle del estudiante
-   */
-  function handleStudentClick(studentId) {
-    navigate(`/students/${studentId}`);
-  }
-
-  /* Si hay resultados de búsqueda, los muestra; si no, muestra la lista original
-   */
+  /* Si hay resultados de búsqueda, los muestra; si no, muestra la lista original */
   const displayedStudents = searchResults !== null ? searchResults : students;
   const isSearching = searchTerm.trim().length >= 2;
 
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-lg text-gray-600">Cargando...</div>
+        <div className="text-lg font-legion uppercase tracking-widest text-gold animate-pulse">Cargando...</div>
       </div>
     );
   }
 
   if (!canView) {
     return (
-      <div className="rounded-lg bg-red-50 p-4 text-red-700">
+      <div className="rounded-xl border border-red-500 bg-red-900/20 p-4 text-red-300">
         No tienes permiso para ver estudiantes.
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Estudiantes</h1>
+    <div className="space-y-8 text-white relative">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-legion font-bold tracking-widest text-white flex items-center gap-3">
+            <span className="text-gold">🥊</span> ESTUDIANTES
+          </h1>
+          <p className="text-muted text-sm mt-1 uppercase tracking-tighter">Administración de la Legión</p>
+        </div>
         {canCreate && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            className="rounded-md bg-gold px-6 py-2 text-xs font-legion font-bold uppercase tracking-widest text-black hover:bg-goldLight transition duration-300 shadow-[0_0_15px_rgba(196,164,124,0.3)]"
           >
             {showForm ? 'Cancelar' : 'Nuevo Estudiante'}
           </button>
@@ -193,11 +190,36 @@ function Students() {
 
       {/* Barra de búsqueda */}
       {canView && (
-        <div className="mb-4">
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+        <div className="mb-4 relative group">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+            <svg
+              className="h-5 w-5 text-gold/50 group-focus-within:text-gold transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="BUSCAR GUERRERO..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            className="w-full rounded-xl border border-border bg-card/40 backdrop-blur-md py-3 pl-12 pr-12 text-gold placeholder-gray-600 focus:border-gold/50 focus:outline-none transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={clearSearch}
+              className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-500 hover:text-gold"
+            >
               <svg
-                className="h-5 w-5 text-gray-400"
+                className="h-5 w-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -206,93 +228,68 @@ function Students() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-            </div>
-            <input
-              type="text"
-              placeholder="Buscar estudiante..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-10 focus:border-blue-500 focus:outline-none"
-            />
-            {searchTerm && (
-              <button
-                onClick={clearSearch}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+            </button>
+          )}
+
+          {/* Estados de búsqueda actualizados al diseño premium */}
+          <div className="absolute left-0 -bottom-6 flex w-full justify-between px-2">
+            {searchLoading && (
+              <div className="text-[10px] uppercase tracking-widest text-gold/70 animate-pulse">
+                Buscando...
+              </div>
+            )}
+
+            {searchError && (
+              <div className="text-[10px] uppercase tracking-widest text-red-400">
+                {searchError}
+              </div>
+            )}
+
+            {isSearching && !searchLoading && searchResults?.length === 0 && (
+              <div className="text-[10px] uppercase tracking-widest text-muted">
+                No se encontraron resultados para "<span className="text-white">{searchTerm}</span>"
+              </div>
+            )}
+
+            {searchResults?.length > 0 && (
+              <div className="text-[10px] uppercase tracking-widest text-muted">
+                <span className="text-gold font-bold">{searchResults.length}</span> resultado{searchResults.length !== 1 ? 's' : ''} encontrado{searchResults.length !== 1 ? 's' : ''}
+              </div>
             )}
           </div>
-
-          {/* Estados de búsqueda */}
-          {searchLoading && (
-            <div className="mt-2 text-sm text-gray-500">
-              Buscando...
-            </div>
-          )}
-
-          {searchError && (
-            <div className="mt-2 text-sm text-red-600">
-              {searchError}
-            </div>
-          )}
-
-          {isSearching && !searchLoading && searchResults?.length === 0 && (
-            <div className="mt-2 text-sm text-gray-600">
-              No se encontraron resultados para "{searchTerm}"
-            </div>
-          )}
-
-          {searchResults?.length > 0 && (
-            <div className="mt-2 text-sm text-gray-600">
-              {searchResults.length} resultado{searchResults.length !== 1 ? 's' : ''} encontrado{searchResults.length !== 1 ? 's' : ''}
-            </div>
-          )}
         </div>
       )}
 
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 p-4 text-red-700">
+        <div className="mb-4 rounded-xl border border-red-500 bg-red-900/20 p-4 text-red-300">
           {error}
         </div>
       )}
 
       {showForm && canCreate && (
-        <div className="mb-6 rounded-lg bg-white p-6 shadow">
-          <h2 className="mb-4 text-lg font-semibold text-gray-700">
-            Crear Estudiante
+        <div className="mb-6 rounded-xl bg-card/80 backdrop-blur-md border border-border p-6 shadow-soft animate-in fade-in slide-in-from-top-4 duration-300">
+          <h2 className="mb-6 text-sm font-legion uppercase tracking-widest text-gold">
+            Registrar Nuevo Ingreso
           </h2>
 
           {formError && (
-            <div className="mb-4 rounded bg-red-100 p-3 text-red-700">
+            <div className="mb-4 rounded bg-red-800/40 p-3 text-red-300 text-sm">
               {formError}
             </div>
           )}
 
           {formSuccess && (
-            <div className="mb-4 rounded bg-green-100 p-3 text-green-700">
+            <div className="mb-4 rounded bg-green-800/40 p-4 text-green-300 text-sm">
               Estudiante creado correctamente.
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+          <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
                 Nombre *
               </label>
               <input
@@ -301,12 +298,12 @@ function Students() {
                 value={formData.first_name}
                 onChange={handleInputChange}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
                 Apellido *
               </label>
               <input
@@ -315,29 +312,12 @@ function Students() {
                 value={formData.last_name}
                 onChange={handleInputChange}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Curso *
-              </label>
-              <select
-                name="course"
-                value={formData.course}
-                onChange={handleInputChange}
-                required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="boxing">Boxeo</option>
-                <option value="kickboxing">Kickboxing</option>
-                <option value="both">Ambos</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
                 Teléfono
               </label>
               <input
@@ -345,12 +325,12 @@ function Students() {
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
                 Dirección
               </label>
               <input
@@ -358,14 +338,30 @@ function Students() {
                 name="address"
                 value={formData.address}
                 onChange={handleInputChange}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
               />
             </div>
-
             <div className="md:col-span-2">
+              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                Curso *
+              </label>
+              <select
+                name="course"
+                value={formData.course}
+                onChange={handleInputChange}
+                required
+                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white text-center focus:border-gold/50 focus:outline-none"
+              >
+                <option value="boxing" className="bg-[#1a1a1a]">BOXEO</option>
+                <option value="kickboxing" className="bg-[#1a1a1a]">KICKBOXING</option>
+                <option value="both" className="bg-[#1a1a1a]">AMBOS</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 flex justify-end">
               <button
                 type="submit"
-                className="rounded-md bg-green-600 px-6 py-2 text-white hover:bg-green-700"
+                className="w-full md:w-auto min-w-[200px] rounded-md bg-white py-3 px-8 text-xs font-bold uppercase tracking-widest text-black hover:bg-gold transition-all duration-300"
               >
                 Guardar
               </button>
@@ -374,31 +370,31 @@ function Students() {
         </div>
       )}
 
-      <div className="rounded-lg bg-white shadow">
+      <div className="rounded-xl bg-card/40 backdrop-blur-sm border border-border shadow-soft overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-white/5">
+                <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
                   Nombre
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
                   Apellido
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
                   Curso
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
                   Estado
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border/50">
               {displayedStudents.length === 0 ? (
                 <tr>
                   <td
                     colSpan="4"
-                    className="px-4 py-8 text-center text-gray-500"
+                    className="px-6 py-8 text-center text-sm text-muted"
                   >
                     {isSearching
                       ? `No se encontraron resultados para "${searchTerm}"`
@@ -410,27 +406,25 @@ function Students() {
                   <tr
                     key={student.id}
                     onClick={() => handleStudentClick(student.id)}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className="cursor-pointer hover:bg-white/[0.02] transition-colors group"
                   >
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm font-medium text-white/90 group-hover:text-gold transition-colors">
                       {student.first_name}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-white/80 group-hover:text-gold transition-colors">
                       {student.last_name}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      <span className="capitalize">{student.course}</span>
+                    <td className="px-6 py-4 text-xs text-muted uppercase tracking-tighter">
+                      {student.course}
                     </td>
-                    <td className="px-4 py-3 text-sm">
-                      {student.is_active ? (
-                        <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                          Activo
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
-                          Inactivo
-                        </span>
-                      )}
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        student.is_active
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}>
+                        {student.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
                     </td>
                   </tr>
                 ))

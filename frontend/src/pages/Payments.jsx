@@ -265,7 +265,7 @@ function Payments() {
             <div>
               <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">Monto</label>
               <input
-                type="number"
+                type="text"
                 name="amount"
                 value={formData.amount}
                 onChange={handleInputChange}
