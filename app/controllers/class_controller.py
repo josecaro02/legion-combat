@@ -22,21 +22,77 @@ class_service = ClassService()
 @require_professor
 def list_classes():
     """List class instances with optional filters.
-
-    Query Parameters:
-        - start_date: Start date filter (YYYY-MM-DD)
-        - end_date: End date filter (YYYY-MM-DD)
-        - course_type: Filter by course type
-        - status: Filter by status
-        - professor_id: Filter by professor
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-
-    Returns:
-        - items: List of class instances
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: start_date
+        in: query
+        type: string
+        format: date
+        description: Start date filter (YYYY-MM-DD)
+      - name: end_date
+        in: query
+        type: string
+        format: date
+        description: End date filter (YYYY-MM-DD)
+      - name: course_type
+        in: query
+        type: string
+        enum: [boxing, kickboxing, both]
+      - name: status
+        in: query
+        type: string
+        enum: [scheduled, in_progress, completed, cancelled]
+      - name: professor_id
+        in: query
+        type: string
+        format: uuid
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+    responses:
+      200:
+        description: List of class instances
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  date:
+                    type: string
+                    format: date
+                  start_time:
+                    type: string
+                  end_time:
+                    type: string
+                  course_type:
+                    type: string
+                  status:
+                    type: string
+                  max_capacity:
+                    type: integer
+            total:
+              type: integer
+            pages:
+              type: integer
+            current_page:
+              type: integer
+      401:
+        description: Unauthorized
     """
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -82,14 +138,53 @@ def list_classes():
 @require_professor
 def get_classes_for_range():
     """Get or generate class instances for a date range.
-
-    Query Parameters:
-        - start_date: Start date (YYYY-MM-DD, required)
-        - end_date: End date (YYYY-MM-DD, required)
-        - course_type: Filter by course type (optional)
-
-    Returns:
-        - List of class instances
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: start_date
+        in: query
+        type: string
+        format: date
+        required: true
+        description: Start date (YYYY-MM-DD)
+      - name: end_date
+        in: query
+        type: string
+        format: date
+        required: true
+        description: End date (YYYY-MM-DD)
+      - name: course_type
+        in: query
+        type: string
+        enum: [boxing, kickboxing, both]
+        description: Filter by course type
+    responses:
+      200:
+        description: List of class instances
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              date:
+                type: string
+              start_time:
+                type: string
+              end_time:
+                type: string
+              course_type:
+                type: string
+              status:
+                type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
@@ -129,19 +224,58 @@ def get_classes_for_range():
 @require_owner
 def create_instance():
     """Create a new class instance (owner only).
-
-    Request Body:
-        - date: Class date (YYYY-MM-DD)
-        - start_time: Start time (HH:MM:SS)
-        - end_time: End time (HH:MM:SS)
-        - course_type: Course type
-        - max_capacity: Maximum capacity
-        - professor_id: Professor ID
-        - template_id: Optional template ID
-        - notes: Optional notes
-
-    Returns:
-        - Created class instance
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - date
+            - start_time
+            - end_time
+            - course_type
+            - professor_id
+          properties:
+            date:
+              type: string
+              format: date
+              example: "2024-03-20"
+            start_time:
+              type: string
+              example: "18:00:00"
+            end_time:
+              type: string
+              example: "19:00:00"
+            course_type:
+              type: string
+              enum: [boxing, kickboxing, both]
+            max_capacity:
+              type: integer
+              default: 20
+            professor_id:
+              type: string
+              format: uuid
+            template_id:
+              type: string
+              format: uuid
+              description: Optional template ID
+            notes:
+              type: string
+    responses:
+      201:
+        description: Class instance created successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
     """
     data = request.get_json()
 
@@ -177,12 +311,43 @@ def create_instance():
 @require_professor
 def get_instance(instance_id: UUID):
     """Get class instance by ID.
-
-    Args:
-        instance_id: Class instance ID
-
-    Returns:
-        - Class instance information
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Class instance information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            date:
+              type: string
+            start_time:
+              type: string
+            end_time:
+              type: string
+            course_type:
+              type: string
+            status:
+              type: string
+            professor_id:
+              type: string
+            max_capacity:
+              type: integer
+      401:
+        description: Unauthorized
+      404:
+        description: Class instance not found
     """
     try:
         instance = class_service.get_instance(instance_id)
@@ -199,20 +364,48 @@ def get_instance(instance_id: UUID):
 @require_owner
 def update_instance(instance_id: UUID):
     """Update class instance (owner only).
-
-    Args:
-        instance_id: Class instance ID
-
-    Request Body:
-        - start_time: New start time (optional)
-        - end_time: New end time (optional)
-        - status: New status (optional)
-        - max_capacity: New max capacity (optional)
-        - professor_id: New professor ID (optional)
-        - notes: New notes (optional)
-
-    Returns:
-        - Updated class instance
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            start_time:
+              type: string
+            end_time:
+              type: string
+            status:
+              type: string
+              enum: [scheduled, in_progress, completed, cancelled]
+            max_capacity:
+              type: integer
+            professor_id:
+              type: string
+              format: uuid
+            notes:
+              type: string
+    responses:
+      200:
+        description: Class instance updated successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Class instance not found
     """
     data = request.get_json()
 
@@ -247,12 +440,32 @@ def update_instance(instance_id: UUID):
 @require_owner
 def delete_instance(instance_id: UUID):
     """Delete class instance (owner only).
-
-    Args:
-        instance_id: Class instance ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Class instance deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Class instance deleted successfully"
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
+      404:
+        description: Class instance not found
     """
     try:
         class_service.delete_instance(instance_id)
@@ -269,12 +482,34 @@ def delete_instance(instance_id: UUID):
 @require_owner
 def cancel_class(instance_id: UUID):
     """Cancel a class (owner only).
-
-    Args:
-        instance_id: Class instance ID
-
-    Returns:
-        - Updated class instance
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Class cancelled successfully
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              example: "cancelled"
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      403:
+        description: Forbidden
     """
     try:
         instance = class_service.cancel_class(instance_id)
@@ -291,12 +526,34 @@ def cancel_class(instance_id: UUID):
 @require_professor
 def complete_class(instance_id: UUID):
     """Mark class as completed.
-
-    Args:
-        instance_id: Class instance ID
-
-    Returns:
-        - Updated class instance
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: instance_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Class marked as completed
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              example: "completed"
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Class instance not found
     """
     try:
         instance = class_service.complete_class(instance_id)
@@ -313,12 +570,28 @@ def complete_class(instance_id: UUID):
 @require_professor
 def get_classes_by_date(date_str: str):
     """Get classes for a specific date.
-
-    Args:
-        date_str: Date in YYYY-MM-DD format
-
-    Returns:
-        - List of class instances
+    ---
+    tags:
+      - Classes
+    security:
+      - Bearer: []
+    parameters:
+      - name: date_str
+        in: path
+        type: string
+        required: true
+        description: Date in YYYY-MM-DD format
+    responses:
+      200:
+        description: List of classes for the date
+        schema:
+          type: array
+          items:
+            type: object
+      400:
+        description: Invalid date format
+      401:
+        description: Unauthorized
     """
     try:
         target_date = date.fromisoformat(date_str)

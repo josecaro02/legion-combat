@@ -15,16 +15,57 @@ user_service = UserService()
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Authenticate user and return tokens.
-
-    Request Body:
-        - email: User email
-        - password: User password
-
-    Returns:
-        - access_token: JWT access token
-        - refresh_token: JWT refresh token
-        - token_type: Token type (bearer)
-        - expires_in: Token expiration in seconds
+    ---
+    tags:
+      - Auth
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - email
+            - password
+          properties:
+            email:
+              type: string
+              format: email
+              description: User email
+              example: "owner@gym.com"
+            password:
+              type: string
+              description: User password
+              example: "securepassword"
+    responses:
+      200:
+        description: Login successful
+        schema:
+          type: object
+          properties:
+            access_token:
+              type: string
+              description: JWT access token
+            refresh_token:
+              type: string
+              description: JWT refresh token
+            token_type:
+              type: string
+              example: "bearer"
+            expires_in:
+              type: integer
+              description: Token expiration in seconds
+              example: 900
+      401:
+        description: Authentication failed
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "AUTHENTICATION_ERROR"
+            message:
+              type: string
     """
     data = request.get_json()
 
@@ -54,17 +95,37 @@ def login():
 @auth_bp.route('/refresh', methods=['POST'])
 def refresh():
     """Refresh access token using refresh token.
-
-    Implements token rotation - returns new access and refresh tokens.
-
-    Request Body:
-        - refresh_token: Valid refresh token
-
-    Returns:
-        - access_token: New JWT access token
-        - refresh_token: New JWT refresh token
-        - token_type: Token type (bearer)
-        - expires_in: Token expiration in seconds
+    ---
+    tags:
+      - Auth
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - refresh_token
+          properties:
+            refresh_token:
+              type: string
+              description: Valid refresh token
+    responses:
+      200:
+        description: Token refresh successful
+        schema:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            token_type:
+              type: string
+            expires_in:
+              type: integer
+      401:
+        description: Invalid or expired refresh token
     """
     data = request.get_json()
 
@@ -94,11 +155,22 @@ def refresh():
 @jwt_required
 def logout():
     """Logout user by revoking refresh token.
-
-    Requires authentication.
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Auth
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: Logout successful
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Logged out successfully"
+      401:
+        description: Unauthorized
     """
     user_id = getattr(g, 'user_id', None)
 
@@ -122,12 +194,25 @@ def logout():
 @jwt_required
 def logout_all():
     """Logout user from all sessions.
-
-    Requires authentication. Revokes all refresh tokens for the user.
-
-    Returns:
-        - message: Success message
-        - revoked_count: Number of revoked tokens
+    ---
+    tags:
+      - Auth
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: All sessions terminated
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "All sessions terminated"
+            revoked_count:
+              type: integer
+              description: Number of revoked tokens
+      401:
+        description: Unauthorized
     """
     user_id = getattr(g, 'user_id', None)
 
@@ -148,11 +233,39 @@ def logout_all():
 @jwt_required
 def get_current_user():
     """Get current authenticated user info.
-
-    Requires authentication.
-
-    Returns:
-        - User information
+    ---
+    tags:
+      - Auth
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: User information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            first_name:
+              type: string
+            last_name:
+              type: string
+            role:
+              type: string
+              enum: [owner, professor]
+            is_active:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+      401:
+        description: Unauthorized
+      404:
+        description: User not found
     """
     user_id = getattr(g, 'user_id', None)
 
@@ -170,15 +283,40 @@ def get_current_user():
 @jwt_required
 def change_password():
     """Change current user password.
-
-    Requires authentication.
-
-    Request Body:
-        - old_password: Current password
-        - new_password: New password (min 8 chars)
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Auth
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - old_password
+            - new_password
+          properties:
+            old_password:
+              type: string
+              description: Current password
+            new_password:
+              type: string
+              description: New password (min 8 characters)
+    responses:
+      200:
+        description: Password updated successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Password updated successfully"
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
     """
     user_id = getattr(g, 'user_id', None)
     data = request.get_json()

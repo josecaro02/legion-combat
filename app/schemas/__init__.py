@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, condecimal
 
 
 # ============== Auth Schemas ==============
@@ -132,6 +132,8 @@ class StudentListResponse(BaseModel):
 
 # ============== Payment Schemas ==============
 
+AmountDecimal = condecimal(max_digits=10, decimal_places=2, gt=0)
+
 class PaymentStatus(str):
     """Payment status."""
     PENDING = "pending"
@@ -142,7 +144,7 @@ class PaymentStatus(str):
 class PaymentCreate(BaseModel):
     """Payment creation schema."""
     student_id: UUID
-    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    amount: AmountDecimal
     due_date: date
     idempotency_key: str = Field(..., min_length=10, max_length=64)
     notes: Optional[str] = None
@@ -150,7 +152,7 @@ class PaymentCreate(BaseModel):
 
 class PaymentUpdate(BaseModel):
     """Payment update schema."""
-    amount: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
+    amount: Optional[AmountDecimal] = None
     due_date: Optional[date] = None
     notes: Optional[str] = None
 

@@ -66,7 +66,12 @@ class AuthService:
             'access_token': access_token,
             'refresh_token': refresh_token,
             'token_type': 'bearer',
-            'expires_in': 900  # 15 minutes
+            'expires_in': 900,  # 15 minutes
+            'user': {
+            'id': str(user.id),
+            'email': user.email,
+            'role': user.role.value
+    }
         }
 
     def refresh(

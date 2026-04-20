@@ -1,25 +1,26 @@
 """Payment schemas."""
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, condecimal
 
+AmountDecimal = condecimal(max_digits=10, decimal_places=2, gt=0)
 
 class PaymentCreate(BaseModel):
     """Payment creation schema."""
     student_id: UUID
-    amount: Decimal = Field(..., gt=0, decimal_places=2)
-    due_date: date
+    amount: AmountDecimal
+    due_date: datetime
     idempotency_key: str = Field(..., min_length=10, max_length=64)
     notes: Optional[str] = None
 
 
 class PaymentUpdate(BaseModel):
     """Payment update schema."""
-    amount: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
-    due_date: Optional[date] = None
+    amount: Optional[AmountDecimal] = None
+    due_date: Optional[datetime] = None
     notes: Optional[str] = None
 
 
@@ -31,8 +32,8 @@ class PaymentResponse(BaseModel):
     student_id: UUID
     amount: Decimal
     status: str
-    payment_date: Optional[date]
-    due_date: date
+    payment_date: Optional[datetime]
+    due_date: datetime
     notes: Optional[str]
     created_at: datetime
 
@@ -62,7 +63,8 @@ class PaymentListResponse(BaseModel):
 
 class PaymentWithStudentResponse(PaymentResponse):
     """Payment with student info response."""
-    student_name: str
+    student_name: Optional[str]
+
 
 
 class OverduePaymentSummary(BaseModel):

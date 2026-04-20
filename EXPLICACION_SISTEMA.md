@@ -5,10 +5,12 @@
 1. [Visión General de la Arquitectura](#visión-general-de-la-arquitectura)
 2. [Sistema de Autenticación JWT](#sistema-de-autenticación-jwt)
 3. [Sistema de Horarios Recurrentes](#sistema-de-horarios-recurrentes)
-4. [Decisiones de Diseño](#decisiones-de-diseño)
-5. [Escalabilidad](#escalabilidad)
-6. [Errores Comunes y Cómo Evitarlos](#errores-comunes-y-cómo-evitarlos)
-7. [Buenas Prácticas Aplicadas](#buenas-prácticas-aplicadas)
+4. [Sistema de Pagos](#sistema-de-pagos)
+5. [Gestión de Estudiantes](#gestión-de-estudiantes)
+6. [Decisiones de Diseño](#decisiones-de-diseño)
+7. [Escalabilidad](#escalabilidad)
+8. [Errores Comunes y Cómo Evitarlos](#errores-comunes-y-cómo-evitarlos)
+9. [Buenas Prácticas Aplicadas](#buenas-prácticas-aplicadas)
 
 ---
 
@@ -238,6 +240,397 @@ def update_template(self, template_id, **changes):
 
 ---
 
+## Sistema de Pagos
+
+El sistema de pagos gestiona las mensualidades de los estudiantes, permitiendo registrar pagos pendientes, marcarlos como pagados, y generar reportes de vencimientos y deudores.
+
+### Modelo de Datos
+
+```python
+class Payment:
+    id: UUID                    # Identificador único del pago
+    student_id: UUID            # Referencia al estudiante
+    amount: Decimal             # Monto del pago (ej: 25000.00)
+    status: PaymentStatus       # pending, paid, overdue
+    due_date: date              # Fecha de vencimiento
+    payment_date: date          # Fecha de pago (null si pending)
+    idempotency_key: str        # Clave única para evitar duplicados
+    notes: str                  # Notas opcionales
+    created_at: datetime
+    updated_at: datetime
+```
+
+### Estados de Pago
+
+- **`pending`**: Pago registrado pero no realizado aún
+- **`paid`**: Pago completado exitosamente
+- **`overdue`**: Pago vencido (pasó la fecha de vencimiento sin pagar)
+
+### Endpoints de Pagos
+
+Todos los endpoints de pagos requieren autenticación JWT (`Bearer` token) y rol de Professor o Owner.
+
+#### 1. Listar Pagos
+
+```
+GET /payments/
+```
+
+**Descripción:** Obtiene lista paginada de todos los pagos con filtros opcionales.
+
+**Parámetros de Query:**
+- `page` (int, opcional): Número de página, default: 1
+- `per_page` (int, opcional): Items por página, default: 20
+- `status` (string, opcional): Filtrar por estado (`pending`, `paid`, `overdue`)
+
+**Respuesta 200:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "student_id": "uuid",
+      "amount": "25000.00",
+      "status": "pending",
+      "due_date": "2024-03-20",
+      "payment_date": null,
+      "student_name": "Juan Pérez"
+    }
+  ],
+  "total": 150,
+  "pages": 8,
+  "current_page": 1
+}
+```
+
+**Uso típico:** Panel de administración para ver todos los pagos, filtrar por estado para ver solo pendientes o vencidos.
+
+---
+
+#### 2. Crear Pago
+
+```
+POST /payments/
+```
+
+**Descripción:** Registra un nuevo pago pendiente para un estudiante. Usa idempotencia para evitar duplicados.
+
+**Body:**
+```json
+{
+  "student_id": "123e4567-e89b-12d3-a456-426614174000",
+  "amount": 25000.00,
+  "due_date": "2024-03-20",
+  "idempotency_key": "payment-juan-marzo-2024",
+  "notes": "Mensualidad marzo 2024"
+}
+```
+
+**Campos requeridos:**
+- `student_id`: UUID del estudiante
+- `amount`: Monto numérico positivo
+- `due_date`: Fecha de vencimiento (YYYY-MM-DD)
+- `idempotency_key`: String único (10-64 chars) para prevenir duplicados
+
+**Respuesta 201:** El pago creado con sus datos.
+
+**Respuesta 400:** Si ya existe un pago con la misma `idempotency_key`, retorna el pago existente (comportamiento idempotente).
+
+**Uso típico:** Registrar la mensualidad de un estudiante. El idempotency_key puede ser generado por el frontend como: `"payment-{student_id}-{mes}-{año}"` para evitar crear el mismo pago dos veces si el usuario hace doble clic.
+
+---
+
+#### 3. Ver Pago por ID
+
+```
+GET /payments/{payment_id}
+```
+
+**Descripción:** Obtiene información detallada de un pago específico.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Respuesta 200:** Información completa del pago incluyendo `student_name` (nombre del estudiante).
+
+**Uso típico:** Ver detalles de un pago específico al hacer clic en él desde la lista.
+
+---
+
+#### 4. Actualizar Pago
+
+```
+PUT /payments/{payment_id}
+```
+
+**Descripción:** Actualiza datos de un pago existente.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Body (todos opcionales):**
+```json
+{
+  "amount": 30000.00,
+  "due_date": "2024-03-25",
+  "notes": "Monto actualizado"
+}
+```
+
+**Campos actualizables:**
+- `amount`: Nuevo monto
+- `due_date`: Nueva fecha de vencimiento
+- `notes`: Nuevas notas
+
+**Restricciones:** No se puede actualizar un pago que ya está `paid` (pagado).
+
+**Uso típico:** Corregir errores en un pago pendiente antes de que se concrete.
+
+---
+
+#### 5. Eliminar Pago
+
+```
+DELETE /payments/{payment_id}
+```
+
+**Descripción:** Elimina un pago del sistema.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Restricciones:** Generalmente solo se permite eliminar pagos `pending`, no pagos ya realizados (por integridad contable).
+
+**Uso típico:** Eliminar un pago registrado por error.
+
+---
+
+#### 6. Ver Pagos de un Estudiante
+
+```
+GET /payments/student/{student_id}
+```
+
+**Descripción:** Obtiene todos los pagos de un estudiante específico.
+
+**Parámetros de Path:**
+- `student_id`: UUID del estudiante
+
+**Parámetros de Query:**
+- `page`, `per_page`: Paginación
+- `status` (opcional): Filtrar por estado
+
+**Respuesta 200:** Lista paginada de pagos del estudiante.
+
+**Uso típico:** Ver historial de pagos de un estudiante específico, ver si tiene pagos pendientes.
+
+---
+
+#### 7. Marcar Pago como Pagado
+
+```
+POST /payments/{payment_id}/mark-paid
+```
+
+**Descripción:** Marca un pago pendiente como pagado.
+
+**Parámetros de Path:**
+- `payment_id`: UUID del pago
+
+**Body (opcional):**
+```json
+{
+  "payment_date": "2024-03-15"
+}
+```
+
+- `payment_date`: Fecha del pago (default: fecha actual)
+
+**Respuesta 200:** El pago actualizado con status `paid` y `payment_date` establecida.
+
+**Respuesta 400:** Si el pago ya está pagado o está vencido (requiere verificación especial).
+
+**Uso típico:** Cuando un estudiante paga su mensualidad, el profesor marca el pago como realizado.
+
+---
+
+#### 8. Próximos Vencimientos
+
+```
+GET /payments/upcoming
+```
+
+**Descripción:** Obtiene pagos que vencen en los próximos N días.
+
+**Parámetros de Query:**
+- `days` (int, opcional): Días hacia adelante a consultar, default: 5
+
+**Respuesta 200:** Lista de pagos con vencimiento próximo.
+
+**Uso típico:** Alertar a los profesores sobre pagos que vencen pronto para que puedan recordar a los estudiantes.
+
+---
+
+#### 9. Pagos Vencidos
+
+```
+GET /payments/overdue
+```
+
+**Descripción:** Obtiene todos los pagos que ya vencieron (pasó la fecha de vencimiento y no están pagados).
+
+**Respuesta 200:** Lista de pagos vencidos con información del estudiante.
+
+**Uso típico:** Generar lista de estudiantes morosos para enviar recordatorios o hacer seguimiento.
+
+---
+
+#### 10. Resumen de Deudores
+
+```
+GET /payments/overdue/summary
+```
+
+**Descripción:** Genera un resumen agregado de deudores, mostrando cuántos pagos debe cada estudiante y el monto total.
+
+**Respuesta 200:**
+```json
+[
+  {
+    "student_id": "uuid",
+    "student_name": "Juan Pérez",
+    "overdue_count": 2,
+    "total_amount": "50000.00"
+  },
+  {
+    "student_id": "uuid",
+    "student_name": "María García",
+    "overdue_count": 1,
+    "total_amount": "25000.00"
+  }
+]
+```
+
+**Uso típico:** Reporte de morosidad para la administración, mostrando quiénes deben más y cuánto.
+
+### Flujo Típico de Trabajo
+
+1. **Registro inicial:** Se crean pagos mensuales para cada estudiante al inicio del mes usando `POST /payments/`
+2. **Consulta diaria:** Se revisan pagos próximos a vencer con `GET /payments/upcoming`
+3. **Cobro:** Cuando un estudiante paga, se marca como pagado con `POST /payments/{id}/mark-paid`
+4. **Seguimiento:** Se revisan pagos vencidos con `GET /payments/overdue`
+5. **Reportes:** Se genera resumen de deudores con `GET /payments/overdue/summary`
+
+### Idempotencia
+
+El sistema implementa idempotencia mediante la clave `idempotency_key`. Esto significa que si haces la misma petición dos veces con la misma clave, solo se creará un pago (la segunda vez retorna el existente). Esto previene duplicados por errores de red o doble clic.
+
+**Cómo generar la clave:**
+```python
+idempotency_key = f"payment-{student_id}-{mes}-{año}"
+# Ejemplo: "payment-123e4567-...-03-2024"
+```
+
+---
+
+## Gestión de Estudiantes
+
+### Modelo de Datos
+
+El modelo `Student` almacena la información de los estudiantes del gimnasio:
+
+```python
+class Student:
+    id: UUID                    # Identificador único
+    first_name: str             # Nombre
+    last_name: str              # Apellido
+    course: CourseType          # Tipo de curso (boxing, kickboxing, both)
+    phone: Optional[str]        # Teléfono de contacto
+    address: Optional[str]      # Dirección
+    enrollment_date: date       # Fecha de inscripción
+    is_active: bool             # Estado del estudiante
+    emergency_contact_name: str    # Nombre del contacto de emergencia (requerido)
+    emergency_contact_phone: str   # Teléfono del contacto de emergencia (requerido)
+    photo_url: Optional[str]        # URL de la foto en Cloudinary (opcional)
+```
+
+### Campos de Contacto de Emergencia
+
+Los campos `emergency_contact_name` y `emergency_contact_phone` son obligatorios al crear un estudiante. Esto garantiza que siempre haya un contacto disponible en caso de emergencia médica durante el entrenamiento.
+
+**Validaciones:**
+- `emergency_contact_name`: mínimo 1 carácter, máximo 100
+- `emergency_contact_phone`: mínimo 7 caracteres, máximo 20, formato validado
+
+### Flujo de Fotos de Estudiantes
+
+El sistema implementa un flujo de captura y almacenamiento de fotos mediante integración con Cloudinary:
+
+```
+Cámara del dispositivo
+         ↓
+    [CameraCapture.jsx]
+         ↓
+    Captura con getUserMedia()
+         ↓
+    Canvas → Compresión JPEG 85%
+         ↓
+    [cloudinary.js]
+         ↓
+    Subida directa a Cloudinary (unsigned preset)
+         ↓
+    URL segura devuelta
+         ↓
+    [Backend] Guarda photo_url en BD
+         ↓
+    [Frontend] Muestra foto desde Cloudinary
+```
+
+#### Responsabilidades del Frontend
+
+1. **CameraCapture.jsx**: Componente que accede a la cámara del dispositivo
+   - Solicita permisos de cámara al usuario
+   - Muestra preview en tiempo real
+   - Captura foto y la convierte a Blob JPEG con calidad 85%
+   - Permite "retake" (volver a tomar) antes de confirmar
+
+2. **cloudinary.js**: Utilidad de subida de imágenes
+   - `compressImage()`: Redimensiona a máximo 1280x1280px
+   - Convierte a JPEG con calidad 85%
+   - Recomprime si excede 2MB
+   - `uploadToCloudinary()`: Sube usando unsigned upload preset
+   - `uploadStudentPhoto()`: Flujo completo compresión + subida
+
+#### Responsabilidades del Backend
+
+1. **Validación de photo_url**: El schema valida que:
+   - Sea una URL válida
+   - Contenga `res.cloudinary.com` (solo imágenes de Cloudinary aceptadas)
+
+2. **Almacenamiento**: Guarda la URL recibida tal cual en el campo `photo_url`
+
+3. **Respuestas**: Incluye `photo_url` en todos los endpoints GET de estudiantes
+
+### Compresión y Optimización de Imágenes
+
+El sistema aplica compresión en múltiples capas:
+
+1. **Captura**: Canvas con calidad JPEG 0.85 (CameraCapture.jsx)
+2. **Redimensión**: Máximo 1280x1280px manteniendo aspect ratio
+3. **Recompresión**: Si excede 2MB, baja calidad progresivamente hasta 0.3
+4. **Formato**: Todas las imágenes se convierten a JPEG
+
+**Objetivo**: Balance entre calidad visual y tamaño de archivo para carga rápida.
+
+### Preview de Imágenes
+
+- **Pre-upload**: Muestra preview local con `URL.createObjectURL()`
+- **Loading state**: Spinner durante la subida a Cloudinary
+- **Success feedback**: Check verde cuando se confirma la subida
+- **Error handling**: Mensaje de error con opción de reintentar
+
+---
+
 ## Decisiones de Diseño
 
 ### 1. SQLAlchemy 2.0 con DeclarativeBase
@@ -287,6 +680,190 @@ class UserRole(str, Enum):
 - Legible en BD (vs enteros mágicos)
 - Fácil debugging
 - Portable entre DBs
+
+---
+
+## Documentación de API con Flasgger
+
+### ¿Qué es Flasgger?
+
+[Flasgger](https://github.com/flasgger/flasgger) es una biblioteca Flask que genera automáticamente una interfaz **Swagger UI** a partir de docstrings YAML en los endpoints. Esto permite:
+
+1. **Explorar la API** de forma interactiva
+2. **Probar endpoints** directamente desde el navegador
+3. **Ver modelos de datos** esperados en requests/responses
+4. **Autenticación integrada** para probar endpoints protegidos
+
+### Configuración
+
+La configuración de Swagger se define en `app/config.py`:
+
+```python
+@classmethod
+def get_swagger_template(cls) -> dict:
+    return {
+        'swagger': '2.0',
+        'info': {
+            'title': 'Legión Combat API',
+            'description': 'Sistema de gestión para gimnasio de boxeo',
+            'version': '1.0.0',
+        },
+        'securityDefinitions': {
+            'Bearer': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'JWT Authorization header. Ejemplo: "Bearer {token}"'
+            }
+        },
+        'tags': [
+            {'name': 'Auth', 'description': 'Autenticación'},
+            {'name': 'Students', 'description': 'Gestión de estudiantes'},
+            ...
+        ]
+    }
+```
+
+En `app/__init__.py` se inicializa:
+
+```python
+from flasgger import Swagger
+
+Swagger(app, template=config.get_swagger_template())
+```
+
+### Cómo Documentar un Endpoint
+
+Los docstrings deben seguir el formato **YAML** con separador `---`:
+
+```python
+@student_bp.route('/', methods=['GET'])
+@jwt_required
+@require_professor
+def list_students():
+    """List students with optional filters.
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: course
+        in: query
+        type: string
+        enum: [boxing, kickboxing, both]
+    responses:
+      200:
+        description: List of students
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  first_name:
+                    type: string
+      401:
+        description: Unauthorized
+    """
+```
+
+### Elementos Importantes del YAML
+
+#### Tags
+Organizan los endpoints por categoría en la UI:
+```yaml
+tags:
+  - Students
+```
+
+#### Seguridad (JWT)
+Indica que el endpoint requiere autenticación:
+```yaml
+security:
+  - Bearer: []
+```
+
+#### Parámetros
+Definen inputs del endpoint:
+
+```yaml
+parameters:
+  # Parámetro de query string
+  - name: page
+    in: query
+    type: integer
+    default: 1
+
+  # Parámetro de URL
+  - name: student_id
+    in: path
+    type: string
+    format: uuid
+    required: true
+
+  # Body de la request (JSON)
+  - name: body
+    in: body
+    required: true
+    schema:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "owner@gym.com"
+```
+
+#### Respuestas
+Documentan los posibles códigos de respuesta:
+
+```yaml
+responses:
+  200:
+    description: Success
+    schema:
+      type: object
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+  401:
+    description: Authentication failed
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "AUTHENTICATION_ERROR"
+```
+
+### Acceso a Swagger UI
+
+Una vez iniciada la aplicación, la documentación está disponible en:
+
+- **Swagger UI**: `http://localhost:5000/apidocs/`
+- **OpenAPI JSON**: `http://localhost:5000/apispec_1.json`
+
+### Ventajas de esta Aproximación
+
+1. **Single Source of Truth**: La documentación vive junto al código
+2. **Siempre actualizada**: Si cambia el endpoint, se actualiza la doc
+3. **Testing interactivo**: No necesitas Postman para probar
+4. **Auto-generada**: No hay que mantener archivos OpenAPI/YAML separados
 
 ---
 
@@ -389,6 +966,279 @@ if existing:
 **Problema:** Cambiar horario del lunes modifica clases pasadas.
 
 **Solución:** Nuestro sistema de versionado crea nuevo template para el futuro, preservando el pasado.
+
+---
+
+## Documentación de API con Swagger (Flasgger)
+
+### ¿Qué es Flasgger?
+
+**Flasgger** es una biblioteca Flask que genera automáticamente documentación Swagger/OpenAPI a partir de los docstrings YAML en los endpoints.
+
+### Configuración
+
+La configuración de Swagger se define en `app/config.py`:
+
+```python
+@classmethod
+def get_swagger_template(cls) -> dict:
+    return {
+        'swagger': '2.0',
+        'info': {
+            'title': 'Legión Combat API',
+            'description': 'Sistema de gestión para gimnasio de boxeo',
+            'version': '1.0.0',
+        },
+        'securityDefinitions': {
+            'Bearer': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'JWT Authorization header. Example: "Bearer {token}"'
+            }
+        },
+        'tags': [...]
+    }
+```
+
+En `app/__init__.py` se inicializa:
+
+```python
+from flasgger import Swagger
+
+Swagger(app, template=config.get_swagger_template())
+```
+
+### Documentación de Endpoints
+
+Cada endpoint se documenta con un docstring en formato YAML:
+
+```python
+@student_bp.route('/', methods=['POST'])
+def create_student():
+    """Create a new student.
+    ---
+    tags:
+      - Students
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - first_name
+            - last_name
+            - course
+          properties:
+            first_name:
+              type: string
+              example: "Juan"
+            course:
+              type: string
+              enum: [boxing, kickboxing, both]
+    responses:
+      201:
+        description: Student created successfully
+      400:
+        description: Validation error
+    """
+    # ... código del endpoint
+```
+
+### Elementos Clave de la Documentación
+
+| Elemento | Descripción |
+|----------|-------------|
+| `tags` | Agrupa endpoints por categoría |
+| `security` | Indica que requiere JWT Bearer token |
+| `parameters` | Define query params, path params y body |
+| `responses` | Documenta códigos de respuesta y schemas |
+| `schema` | Define la estructura de datos esperada |
+
+### Uso de Swagger UI
+
+1. Iniciar la aplicación: `python run.py`
+2. Abrir navegador en: `http://localhost:5000/apidocs/`
+3. Explorar y probar endpoints directamente desde la UI
+
+### Ventajas
+
+- **Documentación viva**: Se actualiza automáticamente con el código
+- **Testing interactivo**: Prueba endpoints desde el navegador
+- **Standard**: Usa OpenAPI/Swagger, estándar de la industria
+- **Cliente API**: Exporta a Postman, genera clientes SDK
+
+---
+
+## Nuevo Endpoint: Recordatorios de Pagos Próximos a Vencer
+
+### Propósito
+
+El endpoint `GET /students/upcoming-payments` permite identificar estudiantes cuyo último pago realizado está próximo a cumplir un mes. Esto es útil para enviar recordatorios de renovación de mensualidad antes de que el mes se complete.
+
+### Lógica del Endpoint
+
+1. **Filtrar estudiantes activos**: Solo considera estudiantes con `is_active = True`
+2. **Encontrar último pago por estudiante**: Obtiene el pago más reciente con `status = "paid"` y `payment_date != NULL`
+3. **Calcular fecha objetivo**: `due_soon_date = payment_date + 1 mes`
+4. **Filtrar por rango**: Incluye solo si `hoy <= due_soon_date <= hoy + days`
+5. **Ordenar**: Por fecha de vencimiento más próxima
+
+### Ejemplo de Uso
+
+```
+GET /students/upcoming-payments?days=5
+```
+
+**Respuesta:**
+```json
+{
+  "items": [
+    {
+      "student": {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "first_name": "Juan",
+        "last_name": "Pérez",
+        "phone": "+56912345678",
+        "course": "boxing"
+      },
+      "last_payment_date": "2024-02-20",
+      "due_soon_date": "2024-03-20"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Implementación SQLAlchemy: Evitando N+1 Queries
+
+La clave de esta implementación es usar una **subconsulta** para obtener el último pago de cada estudiante en una sola query a la base de datos:
+
+```python
+# Subquery: Obtiene la fecha máxima de pago por estudiante
+latest_payment_subq = (
+    select(
+        Payment.student_id.label('student_id'),
+        func.max(Payment.payment_date).label('max_payment_date')
+    )
+    .where(
+        Payment.status == PaymentStatus.PAID,
+        Payment.payment_date.isnot(None)
+    )
+    .group_by(Payment.student_id)
+    .subquery()  # <-- Se convierte en subquery
+)
+
+# Main query: Hace JOIN con Student y Payment
+stmt = (
+    select(Student, Payment.payment_date)
+    .join(latest_payment_subq, Student.id == latest_payment_subq.c.student_id)
+    .join(Payment, and_(
+        Payment.student_id == latest_payment_subq.c.student_id,
+        Payment.payment_date == latest_payment_subq.c.max_payment_date
+    ))
+    .where(Student.is_active == True)
+)
+```
+
+**¿Por qué usar subquery?**
+
+Sin subquery, tendríamos que:
+1. Obtener todos los estudiantes activos (1 query)
+2. Para cada estudiante, consultar su último pago (N queries)
+
+**Total: N+1 queries** ❌
+
+Con subquery:
+1. Una sola query que obtiene estudiantes + último pago
+
+**Total: 1 query** ✅
+
+### Cálculo del "Mes" con PostgreSQL
+
+Para calcular `payment_date + 1 mes` usamos la función nativa de PostgreSQL:
+
+```sql
+payment_date + INTERVAL '1 month'
+```
+
+En SQLAlchemy:
+```python
+from sqlalchemy import text
+
+.where(
+    text("(payment_date + INTERVAL '1 month') >= :today"),
+    text("(payment_date + INTERVAL '1 month') <= :target_max")
+)
+```
+
+**Nota sobre el cálculo de meses:**
+- `INTERVAL '1 month'` en PostgreSQL maneja automáticamente los meses de diferente duración
+- Enero 31 + 1 mes = Febrero 28/29 (según año bisiesto)
+- Febrero 28 + 1 mes = Marzo 28
+- Febrero 29 (bisiesto) + 1 mes = Marzo 29
+
+### Manejo de Fechas Límite en Python
+
+Para mostrar la fecha calculada en la respuesta, implementamos una función auxiliar:
+
+```python
+def _add_months(self, source_date: date, months: int) -> date:
+    """Agrega meses a una fecha, manejando correctamente finales de mes."""
+    import calendar
+
+    year = source_date.year
+    month = source_date.month + months
+
+    # Maneja el rollover de año
+    while month > 12:
+        month -= 12
+        year += 1
+
+    # Maneja días que no existen en el mes destino (ej: 31 -> Feb)
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(source_date.day, last_day)
+
+    return date(year, month, day)
+```
+
+### Seguridad
+
+El endpoint requiere:
+- `@jwt_required`: Token JWT válido
+- `@require_professor`: Rol de profesor o owner
+
+### Parámetros
+
+| Parámetro | Tipo | Default | Descripción |
+|-----------|------|---------|-------------|
+| `days` | int | 5 | Días hacia adelante para buscar pagos próximos a vencer (1-30) |
+
+---
+
+## Limitaciones Conocidas
+
+### Imágenes Huérfanas en Cloudinary
+
+**Situación**: Cuando un usuario registra un estudiante con foto:
+
+1. Frontend sube la imagen a Cloudinary (obtiene URL)
+2. Frontend envía datos del estudiante + photo_url al backend
+3. Si el backend falla (error de validación, BD caída, etc.), el estudiante NO se guarda
+4. Sin embargo, la imagen SÍ existe en Cloudinary
+
+**Resultado**: Imágenes "huérfanas" en Cloudinary sin referencia en la base de datos.
+
+**Decisión**: Este es un **trade-off aceptado** por diseño:
+- No se implementó mecanismo de cleanup automático
+- El backend no gestiona el almacenamiento de Cloudinary
+- Solo valida que la URL venga de Cloudinary (`res.cloudinary.com`)
+- El costo de imágenes huérfanas es menor que la complejidad de un sistema de rollback
+
+**Mitigación**: Las imágenes en Cloudinary tienen un costo muy bajo y pueden limpiarse periódicamente mediante scripts externos si es necesario.
 
 ---
 

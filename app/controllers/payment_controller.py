@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 
 from app.middleware.auth_middleware import jwt_required
 from app.middleware.rbac_middleware import require_professor
-from app.schemas.payment import PaymentCreate, PaymentResponse, PaymentUpdate
+from app.schemas.payment import PaymentCreate, PaymentResponse, PaymentUpdate, PaymentWithStudentResponse
 from app.services.payment_service import PaymentService
 
 payment_bp = Blueprint('payments', __name__)
@@ -17,17 +17,61 @@ payment_service = PaymentService()
 @require_professor
 def list_payments():
     """List payments with optional filters.
-
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-        - status: Filter by status (pending, paid, overdue)
-
-    Returns:
-        - items: List of payments
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: Page number
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+        description: Items per page
+      - name: status
+        in: query
+        type: string
+        enum: [pending, paid, overdue]
+        description: Filter by payment status
+    responses:
+      200:
+        description: List of payments
+        schema:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  student_id:
+                    type: string
+                    format: uuid
+                  amount:
+                    type: string
+                    example: "25000.00"
+                  status:
+                    type: string
+                    enum: [pending, paid, overdue]
+                  due_date:
+                    type: string
+                    format: date
+            total:
+              type: integer
+            pages:
+              type: integer
+            current_page:
+              type: integer
+      401:
+        description: Unauthorized
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -40,7 +84,13 @@ def list_payments():
             per_page=per_page
         )
         return jsonify({
-            'items': [PaymentResponse.from_orm(p).model_dump() for p in result['items']],
+            'items': [
+              PaymentWithStudentResponse(
+                  **PaymentResponse.model_validate(p).model_dump(),
+                  student_name=p.student.full_name if p.student else None
+              ).model_dump(mode="json")
+              for p in result['items']
+            ],
             'total': result['total'],
             'pages': result['pages'],
             'current_page': result['current_page']
@@ -57,16 +107,51 @@ def list_payments():
 @require_professor
 def create_payment():
     """Create a new payment.
-
-    Request Body:
-        - student_id: Student ID
-        - amount: Payment amount
-        - due_date: Due date (YYYY-MM-DD)
-        - idempotency_key: Unique key for idempotency (10-64 chars)
-        - notes: Optional notes
-
-    Returns:
-        - Created payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - student_id
+            - amount
+            - due_date
+            - idempotency_key
+          properties:
+            student_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            amount:
+              type: number
+              format: decimal
+              description: Payment amount (positive number)
+              example: 25000.00
+            due_date:
+              type: string
+              format: date
+              example: "2024-03-20"
+            idempotency_key:
+              type: string
+              minLength: 10
+              maxLength: 64
+              description: Unique key to prevent duplicate payments
+            notes:
+              type: string
+              description: Optional notes
+    responses:
+      201:
+        description: Payment created successfully
+      400:
+        description: Validation error or duplicate payment
+      401:
+        description: Unauthorized
     """
     data = request.get_json()
 
@@ -99,12 +184,41 @@ def create_payment():
 @require_professor
 def get_payment(payment_id: UUID):
     """Get payment by ID.
-
-    Args:
-        payment_id: Payment ID
-
-    Returns:
-        - Payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Payment information
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            student_id:
+              type: string
+            amount:
+              type: string
+            status:
+              type: string
+            due_date:
+              type: string
+            payment_date:
+              type: string
+            student_name:
+              type: string
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     try:
         payment = payment_service.get_payment_with_student(payment_id)
@@ -124,17 +238,40 @@ def get_payment(payment_id: UUID):
 @require_professor
 def update_payment(payment_id: UUID):
     """Update payment.
-
-    Args:
-        payment_id: Payment ID
-
-    Request Body:
-        - amount: New amount (optional)
-        - due_date: New due date (optional)
-        - notes: New notes (optional)
-
-    Returns:
-        - Updated payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            amount:
+              type: number
+              description: New amount
+            due_date:
+              type: string
+              format: date
+            notes:
+              type: string
+    responses:
+      200:
+        description: Payment updated successfully
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     data = request.get_json()
 
@@ -161,17 +298,156 @@ def update_payment(payment_id: UUID):
         }), 400
 
 
+@payment_bp.route('/quick-pay', methods=['POST'])
+@jwt_required
+@require_professor
+def quick_pay():
+    """Quick pay - Create payment and mark as paid in one operation.
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - student_id
+            - amount
+          properties:
+            student_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            amount:
+              type: number
+              format: decimal
+              description: Payment amount (positive number)
+              example: 25000.00
+            notes:
+              type: string
+              description: Optional notes
+    responses:
+      201:
+        description: Payment created and marked as paid successfully
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            student_id:
+              type: string
+              format: uuid
+            amount:
+              type: string
+            status:
+              type: string
+              example: "paid"
+            due_date:
+              type: string
+              format: date
+            payment_date:
+              type: string
+              format: date
+            notes:
+              type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+    """
+    from datetime import datetime, timezone
+    from dateutil.relativedelta import relativedelta
+    from uuid import uuid4
+    from decimal import Decimal
+
+    data = request.get_json()
+
+    # Validate required fields
+    student_id = data.get('student_id')
+    amount = data.get('amount')
+
+    if not student_id:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'student_id is required'
+        }), 400
+
+    if not amount:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'amount is required'
+        }), 400
+
+    try:
+        amount = Decimal(str(amount))
+        if amount <= 0:
+            raise ValueError("Amount must be greater than 0")
+    except (ValueError, TypeError):
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'amount must be a positive number'
+        }), 400
+
+    # Usar datetime UTC con timezone
+    now = datetime.now(timezone.utc)
+    due_date = now + relativedelta(months=1)
+
+    try:
+        # 1. Create payment with due_date = 1 mes desde ahora, status = pending
+        payment = payment_service.create_payment(
+            student_id=UUID(student_id),
+            amount=amount,
+            due_date=due_date,
+            idempotency_key=str(uuid4()),
+            notes=data.get('notes')
+        )
+        print(now)
+        # 2. Mark as paid con payment_date = now
+        payment = payment_service.mark_as_paid(payment.id, now)
+
+        return jsonify(PaymentResponse.from_orm(payment).model_dump()), 201
+    except Exception as e:
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': str(e)
+        }), 400
+
+
+
 @payment_bp.route('/<uuid:payment_id>', methods=['DELETE'])
 @jwt_required
 @require_professor
 def delete_payment(payment_id: UUID):
     """Delete payment.
-
-    Args:
-        payment_id: Payment ID
-
-    Returns:
-        - message: Success message
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+    responses:
+      200:
+        description: Payment deleted successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Payment deleted successfully"
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     try:
         payment_service.delete_payment(payment_id)
@@ -188,20 +464,36 @@ def delete_payment(payment_id: UUID):
 @require_professor
 def get_student_payments(student_id: UUID):
     """Get payments for a student.
-
-    Args:
-        student_id: Student ID
-
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-        - status: Filter by status
-
-    Returns:
-        - items: List of payments
-        - total: Total count
-        - pages: Total pages
-        - current_page: Current page number
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: student_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: page
+        in: query
+        type: integer
+        default: 1
+      - name: per_page
+        in: query
+        type: integer
+        default: 20
+      - name: status
+        in: query
+        type: string
+        enum: [pending, paid, overdue]
+    responses:
+      200:
+        description: List of payments for student
+      401:
+        description: Unauthorized
+      404:
+        description: Student not found
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -232,23 +524,59 @@ def get_student_payments(student_id: UUID):
 @require_professor
 def mark_payment_paid(payment_id: UUID):
     """Mark payment as paid.
-
-    Args:
-        payment_id: Payment ID
-
-    Request Body:
-        - payment_date: Optional payment date (defaults to today)
-
-    Returns:
-        - Updated payment information
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: payment_id
+        in: path
+        type: string
+        format: uuid
+        required: true
+      - name: body
+        in: body
+        required: false
+        schema:
+          type: object
+          properties:
+            payment_date:
+              type: string
+              format: date
+              description: Optional payment date (defaults to today)
+    responses:
+      200:
+        description: Payment marked as paid
+        schema:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              example: "paid"
+            payment_date:
+              type: string
+      400:
+        description: Validation error
+      401:
+        description: Unauthorized
+      404:
+        description: Payment not found
     """
     data = request.get_json() or {}
-    payment_date = data.get('payment_date')
+    payment_date_str = data.get('payment_date')
 
     try:
-        from datetime import date
-        if payment_date:
-            payment_date = date.fromisoformat(payment_date)
+        payment_date = None
+        if payment_date_str:
+            from datetime import datetime, timezone
+            # Parsear como datetime y asegurar que tenga timezone
+            if isinstance(payment_date_str, str):
+                payment_date = datetime.fromisoformat(payment_date_str.replace('Z', '+00:00'))
+            else:
+                payment_date = payment_date_str
 
         payment = payment_service.mark_as_paid(payment_id, payment_date)
         return jsonify(PaymentResponse.from_orm(payment).model_dump()), 200
@@ -264,12 +592,26 @@ def mark_payment_paid(payment_id: UUID):
 @require_professor
 def get_upcoming_payments():
     """Get upcoming payments due in next N days.
-
-    Query Parameters:
-        - days: Number of days to look ahead (default: 5)
-
-    Returns:
-        - List of upcoming payments
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    parameters:
+      - name: days
+        in: query
+        type: integer
+        default: 5
+        description: Number of days to look ahead
+    responses:
+      200:
+        description: List of upcoming payments
+        schema:
+          type: array
+          items:
+            type: object
+      401:
+        description: Unauthorized
     """
     days = request.args.get('days', 5, type=int)
 
@@ -288,9 +630,29 @@ def get_upcoming_payments():
 @require_professor
 def get_overdue_payments():
     """Get overdue payments.
-
-    Returns:
-        - List of overdue payments with student info
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: List of overdue payments
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              student_name:
+                type: string
+              amount:
+                type: string
+              due_date:
+                type: string
+      401:
+        description: Unauthorized
     """
     try:
         payments = payment_service.get_overdue_payments()
@@ -307,9 +669,29 @@ def get_overdue_payments():
 @require_professor
 def get_overdue_summary():
     """Get summary of overdue payments by student.
-
-    Returns:
-        - List of student summaries with overdue counts and totals
+    ---
+    tags:
+      - Payments
+    security:
+      - Bearer: []
+    responses:
+      200:
+        description: Summary of debtors
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              student_id:
+                type: string
+              student_name:
+                type: string
+              overdue_count:
+                type: integer
+              total_amount:
+                type: string
+      401:
+        description: Unauthorized
     """
     try:
         summary = payment_service.get_overdue_summary()

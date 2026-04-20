@@ -1,5 +1,8 @@
 """Flask application factory."""
+import os
 from flask import Flask
+from flasgger import Swagger
+from flask_cors import CORS
 
 from app.config import Config, get_config
 from app.controllers import register_blueprints
@@ -22,19 +25,35 @@ def create_app(config: Config = None) -> Flask:
         config = get_config()
 
     app.config.from_object(config)
+    
+    allowed_origins = [
+        "https://tu-app.vercel.app"
+    ]
+
+    # Permitir localhost solo en desarrollo
+    if os.getenv("FLASK_ENV") == "development":
+        allowed_origins.append("http://localhost:5173")
+
+    CORS(
+        app,
+        resources={r"/*": {"origins": allowed_origins}},
+        supports_credentials=True
+    )
 
     # Initialize extensions
     db.init_app(app)
 
+    from app.commands import create_owner
+    app.cli.add_command(create_owner)
+
     # Register blueprints
     register_blueprints(app)
 
+    # Initialize Flasgger (Swagger)
+    Swagger(app, template=config.get_swagger_template())
+
     # Register error handlers
     register_error_handlers(app)
-
-    # Create tables (for development only - use migrations in production)
-    with app.app_context():
-        db.create_all()
 
     return app
 
