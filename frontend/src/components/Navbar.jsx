@@ -18,7 +18,7 @@ function Navbar() {
           to="/dashboard"
           className="font-legion font-bold uppercase tracking-widest text-lg md:text-xl bg-gradient-to-r from-yellow-500 via-yellow-300 to-yellow-600 bg-clip-text text-transparent drop-shadow-[0_0_6px_rgba(212,175,55,0.6)] shrink-0"
         >
-          Legión Combat
+          Legion Combat
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-4">

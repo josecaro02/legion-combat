@@ -73,7 +73,7 @@ function Dashboard() {
     setUpcomingLoading(true);
     setUpcomingError(null);
     try {
-      const result = await getUpcomingPayments(token, 30);
+      const result = await getUpcomingPayments(token, 5);
       setUpcomingData(result);
       setUpcomingShowList(true);
     } catch (err) {
