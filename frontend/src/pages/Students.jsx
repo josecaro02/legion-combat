@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { getStudents, createStudent, searchStudents } from '../api/students.api';
+import CameraCapture from '../components/CameraCapture';
+import { uploadStudentPhoto, isCloudinaryConfigured } from '../utils/cloudinary';
 
 /**
  * Students Component
  *
  * Muestra lista de estudiantes con funcionalidad de búsqueda en tiempo real.
  * Incluye debounce para optimizar las llamadas a la API.
+ * Ahora con captura de foto y contacto de emergencia.
  */
 function Students() {
   const navigate = useNavigate();
@@ -23,6 +26,9 @@ function Students() {
     course: 'boxing',
     phone: '',
     address: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    photo_url: '',
   });
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(false);
@@ -33,8 +39,18 @@ function Students() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
 
+  // Estados para la foto
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+
   const canView = hasPermission(user, 'canViewStudents');
   const canCreate = hasPermission(user, 'canCreateStudent');
+
+  // Verificar si Cloudinary está configurado
+  const cloudinaryReady = isCloudinaryConfigured();
 
   useEffect(() => {
     if (canView && token) {
@@ -97,22 +113,75 @@ function Students() {
     }
   }
 
+  /**
+   * Handle photo capture from camera
+   */
+  async function handlePhotoCapture(file) {
+    setCapturedPhoto(file);
+    setShowCamera(false);
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    try {
+      const result = await uploadStudentPhoto(file);
+      setFormData(prev => ({ ...prev, photo_url: result.secure_url }));
+      setUploadSuccess(true);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setUploadError(err.message || 'Error al subir la imagen. Intenta de nuevo.');
+      // Limpiar la foto capturada si falla la subida
+      setCapturedPhoto(null);
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  /**
+   * Handle camera error
+   */
+  function handleCameraError(errorMessage) {
+    setUploadError(errorMessage);
+  }
+
+  /**
+   * Remove captured photo
+   */
+  function removePhoto() {
+    setCapturedPhoto(null);
+    setFormData(prev => ({ ...prev, photo_url: '' }));
+    setUploadSuccess(false);
+    setUploadError(null);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!canCreate) return;
+
+    // Validar campos requeridos
+    if (!formData.emergency_contact_name.trim() || !formData.emergency_contact_phone.trim()) {
+      setFormError('El contacto de emergencia es requerido (nombre y teléfono)');
+      return;
+    }
 
     try {
       setFormError(null);
       setFormSuccess(false);
       await createStudent(token, formData);
       setFormSuccess(true);
+      // Reset form
       setFormData({
         first_name: '',
         last_name: '',
         course: 'boxing',
         phone: '',
         address: '',
+        emergency_contact_name: '',
+        emergency_contact_phone: '',
+        photo_url: '',
       });
+      setCapturedPhoto(null);
+      setUploadSuccess(false);
       loadStudents();
       setTimeout(() => setShowForm(false), 1500);
     } catch (err) {
@@ -152,6 +221,15 @@ function Students() {
   /* Si hay resultados de búsqueda, los muestra; si no, muestra la lista original */
   const displayedStudents = searchResults !== null ? searchResults : students;
   const isSearching = searchTerm.trim().length >= 2;
+
+  // Mostrar foto del estudiante (de la lista o placeholder)
+  function getStudentPhotoUrl(student) {
+    if (student.photo_url) {
+      return student.photo_url;
+    }
+    // Placeholder con iniciales
+    return null;
+  }
 
   if (loading) {
     return (
@@ -287,83 +365,222 @@ function Students() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-2">
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
-                Nombre *
-              </label>
-              <input
-                type="text"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleInputChange}
-                required
-                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
-              />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Sección: Foto del Estudiante */}
+            <div className="border-b border-border/50 pb-6">
+              <h3 className="text-[10px] uppercase tracking-widest text-gold/80 mb-4">
+                Foto del Guerrero
+              </h3>
+
+              {!cloudinaryReady && (
+                <div className="mb-4 rounded-lg border border-yellow-500/50 bg-yellow-900/20 p-3 text-yellow-300 text-xs">
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Servicio de fotos no configurado. Contacta al administrador.</span>
+                  </div>
+                </div>
+              )}
+
+              {showCamera && cloudinaryReady && (
+                <div className="mb-4">
+                  <CameraCapture
+                    onCapture={handlePhotoCapture}
+                    onError={handleCameraError}
+                    className="mb-4"
+                  />
+                </div>
+              )}
+
+              {!showCamera && !capturedPhoto && (
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCamera(true)}
+                    disabled={!cloudinaryReady}
+                    className="flex items-center gap-2 rounded-lg border border-gold/50 bg-gold/10 px-4 py-3 text-sm text-gold hover:bg-gold/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Capturar Foto
+                  </button>
+                  <span className="text-xs text-muted">
+                    La foto es opcional pero recomendada
+                  </span>
+                </div>
+              )}
+
+              {/* Preview de foto capturada */}
+              {capturedPhoto && (
+                <div className="relative inline-block">
+                  <div className="w-32 h-32 rounded-xl overflow-hidden border-2 border-gold/50">
+                    <img
+                      src={URL.createObjectURL(capturedPhoto)}
+                      alt="Foto capturada"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removePhoto}
+                    className="absolute -top-2 -right-2 rounded-full bg-red-500 text-white p-1 hover:bg-red-600 transition"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              {/* Estados de upload */}
+              {isUploading && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-gold">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Subiendo imagen...
+                </div>
+              )}
+
+              {uploadSuccess && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-green-400">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Imagen subida correctamente
+                </div>
+              )}
+
+              {uploadError && (
+                <div className="mt-4 rounded bg-red-800/40 p-3 text-red-300 text-sm">
+                  {uploadError}
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
-                Apellido *
-              </label>
-              <input
-                type="text"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleInputChange}
-                required
-                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
-              />
+            {/* Sección: Datos Personales */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                  Nombre *
+                </label>
+                <input
+                  type="text"
+                  name="first_name"
+                  value={formData.first_name}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                  Apellido *
+                </label>
+                <input
+                  type="text"
+                  name="last_name"
+                  value={formData.last_name}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                  Teléfono
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                  Dirección
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                  Curso *
+                </label>
+                <select
+                  name="course"
+                  value={formData.course}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white text-center focus:border-gold/50 focus:outline-none"
+                >
+                  <option value="boxing" className="bg-[#1a1a1a]">BOXEO</option>
+                  <option value="kickboxing" className="bg-[#1a1a1a]">KICKBOXING</option>
+                  <option value="both" className="bg-[#1a1a1a]">AMBOS</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
-              />
-            </div>
+            {/* Sección: Contacto de Emergencia */}
+            <div className="border-t border-border/50 pt-6">
+              <h3 className="text-[10px] uppercase tracking-widest text-gold/80 mb-4">
+                Contacto de Emergencia *
+              </h3>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                    Nombre Contacto *
+                  </label>
+                  <input
+                    type="text"
+                    name="emergency_contact_name"
+                    value={formData.emergency_contact_name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Ej: María Pérez (Madre)"
+                    className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none placeholder:text-gray-600"
+                  />
+                </div>
 
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
-                Dirección
-              </label>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleInputChange}
-                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
-                Curso *
-              </label>
-              <select
-                name="course"
-                value={formData.course}
-                onChange={handleInputChange}
-                required
-                className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white text-center focus:border-gold/50 focus:outline-none"
-              >
-                <option value="boxing" className="bg-[#1a1a1a]">BOXEO</option>
-                <option value="kickboxing" className="bg-[#1a1a1a]">KICKBOXING</option>
-                <option value="both" className="bg-[#1a1a1a]">AMBOS</option>
-              </select>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted mb-2 block ml-1">
+                    Teléfono Contacto *
+                  </label>
+                  <input
+                    type="tel"
+                    name="emergency_contact_phone"
+                    value={formData.emergency_contact_phone}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Ej: +56987654321"
+                    className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none placeholder:text-gray-600"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="md:col-span-2 flex justify-end">
               <button
                 type="submit"
-                className="w-full md:w-auto min-w-[200px] rounded-md bg-white py-3 px-8 text-xs font-bold uppercase tracking-widest text-black hover:bg-gold transition-all duration-300"
+                disabled={isUploading}
+                className="w-full md:w-auto min-w-[200px] rounded-md bg-white py-3 px-8 text-xs font-bold uppercase tracking-widest text-black hover:bg-gold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Guardar
+                {isUploading ? 'Subiendo foto...' : 'Guardar'}
               </button>
             </div>
           </form>
@@ -375,6 +592,9 @@ function Students() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-border bg-white/5">
+                <th className="px-4 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted w-16">
+                  Foto
+                </th>
                 <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
                   Nombre
                 </th>
@@ -385,6 +605,9 @@ function Students() {
                   Curso
                 </th>
                 <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
+                  Contacto Emergencia
+                </th>
+                <th className="px-6 py-4 text-left text-[10px] font-legion uppercase tracking-[0.2em] text-muted">
                   Estado
                 </th>
               </tr>
@@ -393,7 +616,7 @@ function Students() {
               {displayedStudents.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="4"
+                    colSpan="6"
                     className="px-6 py-8 text-center text-sm text-muted"
                   >
                     {isSearching
@@ -408,6 +631,26 @@ function Students() {
                     onClick={() => handleStudentClick(student.id)}
                     className="cursor-pointer hover:bg-white/[0.02] transition-colors group"
                   >
+                    {/* Foto del estudiante */}
+                    <td className="px-4 py-3">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-card border border-border flex items-center justify-center">
+                        {student.photo_url ? (
+                          <img
+                            src={student.photo_url}
+                            alt={`${student.first_name} ${student.last_name}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.parentElement.innerHTML = `<span class="text-xs text-gold font-bold">${student.first_name.charAt(0)}</span>`;
+                            }}
+                          />
+                        ) : (
+                          <span className="text-xs text-gold font-bold">
+                            {student.first_name ? student.first_name.charAt(0).toUpperCase() : '?'}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-white/90 group-hover:text-gold transition-colors">
                       {student.first_name}
                     </td>
@@ -417,10 +660,13 @@ function Students() {
                     <td className="px-6 py-4 text-xs text-muted uppercase tracking-tighter">
                       {student.course}
                     </td>
+                    <td className="px-6 py-4 text-xs text-white/70">
+                      {student.emergency_contact_name || '-'}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                         student.is_active
-                        ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                         : 'bg-red-500/10 text-red-400 border border-red-500/20'
                       }`}>
                         {student.is_active ? 'Activo' : 'Inactivo'}

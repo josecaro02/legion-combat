@@ -24,9 +24,12 @@ class StudentService:
         first_name: str,
         last_name: str,
         course: str,
+        emergency_contact_name: str,
+        emergency_contact_phone: str,
         address: Optional[str] = None,
         phone: Optional[str] = None,
-        enrollment_date: Optional[date] = None
+        enrollment_date: Optional[date] = None,
+        photo_url: Optional[str] = None
     ) -> Student:
         """Create a new student.
 
@@ -34,9 +37,12 @@ class StudentService:
             first_name: First name
             last_name: Last name
             course: Course type (boxing, kickboxing, both)
+            emergency_contact_name: Emergency contact name (required)
+            emergency_contact_phone: Emergency contact phone (required)
             address: Optional address
             phone: Optional phone
             enrollment_date: Optional enrollment date (defaults to today)
+            photo_url: Optional photo URL from Cloudinary
 
         Returns:
             Created student
@@ -51,9 +57,12 @@ class StudentService:
             first_name=first_name,
             last_name=last_name,
             course=course_type,
+            emergency_contact_name=emergency_contact_name,
+            emergency_contact_phone=emergency_contact_phone,
             address=address,
             phone=phone,
-            enrollment_date=enrollment_date or date.today()
+            enrollment_date=enrollment_date or date.today(),
+            photo_url=photo_url
         )
         return self.student_repo.create(student)
 
@@ -150,7 +159,10 @@ class StudentService:
         address: Optional[str] = None,
         phone: Optional[str] = None,
         course: Optional[str] = None,
-        is_active: Optional[bool] = None
+        is_active: Optional[bool] = None,
+        emergency_contact_name: Optional[str] = None,
+        emergency_contact_phone: Optional[str] = None,
+        photo_url: Optional[str] = None
     ) -> Student:
         """Update student.
 
@@ -162,6 +174,9 @@ class StudentService:
             phone: New phone
             course: New course type
             is_active: New active status
+            emergency_contact_name: New emergency contact name
+            emergency_contact_phone: New emergency contact phone
+            photo_url: New photo URL from Cloudinary
 
         Returns:
             Updated student
@@ -183,6 +198,12 @@ class StudentService:
                 raise ValidationError(f"Invalid course type: {course}")
         if is_active is not None:
             student.is_active = is_active
+        if emergency_contact_name is not None:
+            student.emergency_contact_name = emergency_contact_name
+        if emergency_contact_phone is not None:
+            student.emergency_contact_phone = emergency_contact_phone
+        if photo_url is not None:
+            student.photo_url = photo_url
 
         return self.student_repo.update(student)
 

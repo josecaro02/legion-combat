@@ -1,4 +1,4 @@
-import { authGet, authPost } from './client';
+import { authGet, authPost, authPut } from './client';
 
 const ENDPOINT = '/students';
 
@@ -29,13 +29,51 @@ export async function getStudents(token, params = {}) {
  * @param {string} data.first_name
  * @param {string} data.last_name
  * @param {string} data.course - 'boxing', 'kickboxing', or 'both'
+ * @param {string} data.emergency_contact_name
+ * @param {string} data.emergency_contact_phone
  * @param {string} [data.address]
  * @param {string} [data.phone]
+ * @param {string} [data.photo_url]
  * @param {string} [data.enrollment_date]
  * @returns {Promise<Object>}
  */
 export async function createStudent(token, data) {
   return authPost(ENDPOINT + '/', data, token);
+}
+
+/**
+ * Update an existing student
+ * @param {string} token - JWT token
+ * @param {string} studentId - Student UUID
+ * @param {Object} data - Student data to update
+ * @param {string} [data.first_name]
+ * @param {string} [data.last_name]
+ * @param {string} [data.course]
+ * @param {string} [data.emergency_contact_name]
+ * @param {string} [data.emergency_contact_phone]
+ * @param {string} [data.photo_url]
+ * @param {string} [data.address]
+ * @param {string} [data.phone]
+ * @param {boolean} [data.is_active]
+ * @returns {Promise<Object>}
+ */
+export async function updateStudent(token, studentId, data) {
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${ENDPOINT}/${studentId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || result.error || 'Request failed');
+  }
+
+  return result;
 }
 
 /**
@@ -58,6 +96,7 @@ export async function getStudent(token, studentId) {
   return authGet(`${ENDPOINT}/${studentId}`, token);
 }
 
+
 /**
  * Deactivate a student
  * @param {string} token - JWT token
@@ -77,6 +116,7 @@ export async function deactivateStudent(token, studentId) {
 export async function activateStudent(token, studentId) {
   return authPost(`${ENDPOINT}/${studentId}/activate`, {}, token);
 }
+
 
 /**
  * Get students with upcoming payments due within N days

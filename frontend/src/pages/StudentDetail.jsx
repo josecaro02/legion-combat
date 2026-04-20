@@ -8,6 +8,7 @@ import { getStudentPayments } from '../api/payments.api';
 /**
  * StudentDetail Component
  * Rediseñado con estética Premium Oscura
+ * Ahora incluye foto y contacto de emergencia
  */
 function StudentDetail() {
   const { id } = useParams();
@@ -18,6 +19,7 @@ function StudentDetail() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [imageError, setImageError] = useState(false);
 
   const canView = hasPermission(user, 'canViewStudents');
   const canCreatePayment = hasPermission(user, 'canCreatePayment');
@@ -34,6 +36,7 @@ function StudentDetail() {
     try {
       setLoading(true);
       setError(null);
+      setImageError(false);
       const [studentData, paymentsData] = await Promise.all([
         getStudent(token, id),
         getStudentPayments(token, id),
@@ -80,6 +83,13 @@ function StudentDetail() {
     return classes[status] || 'bg-gray-500/10 text-gray-400 border border-gray-500/20';
   }
 
+  /**
+   * Handle image load error - fallback to initials
+   */
+  function handleImageError() {
+    setImageError(true);
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -122,9 +132,40 @@ function StudentDetail() {
         </button>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-          <h1 className="text-4xl font-legion font-bold tracking-tighter text-white uppercase italic">
-            {student.first_name} <span className="text-gold">{student.last_name}</span>
-          </h1>
+          <div className="flex items-center gap-4">
+            {/* Foto del estudiante con fallback */}
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden bg-card border-2 border-gold/30 flex-shrink-0">
+              {!imageError && student.photo_url ? (
+                <img
+                  src={student.photo_url}
+                  alt={`${student.first_name} ${student.last_name}`}
+                  className="w-full h-full object-cover"
+                  onError={handleImageError}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gold/10">
+                  <span className="text-2xl md:text-3xl text-gold font-bold">
+                    {student.first_name && student.last_name
+                      ? `${student.first_name.charAt(0)}${student.last_name.charAt(0)}`
+                      : '?'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h1 className="text-3xl md:text-4xl font-legion font-bold tracking-tighter text-white uppercase italic">
+                {student.first_name} <span className="text-gold">{student.last_name}</span>
+              </h1>
+              <p className="text-muted text-sm mt-1">
+                {student.course === 'boxing' && 'Boxeador'}
+                {student.course === 'kickboxing' && 'Kickboxer'}
+                {student.course === 'both' && 'Artista Marcial'}
+                {' '}de la Legión
+              </p>
+            </div>
+          </div>
+
           {canCreatePayment && (
             <button
               onClick={handleRegisterPayment}
@@ -141,30 +182,65 @@ function StudentDetail() {
         <h2 className="mb-6 text-[10px] font-legion uppercase tracking-[0.3em] text-gold/80 border-b border-white/5 pb-2">
           Expediente del Guerrero
         </h2>
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-muted">Disciplina</span>
-            <p className="text-sm font-bold uppercase text-white tracking-wide">{student.course}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-muted">Contacto Directo</span>
-            <p className="text-sm text-white/90">{student.phone || 'N/A'}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-muted">Estado Actual</span>
-            <div>
-              <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${student.is_active ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
-                {student.is_active ? 'Activo' : 'Inactivo'}
-              </span>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Columna 1: Información Personal */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Disciplina</span>
+              <p className="text-sm font-bold uppercase text-white tracking-wide">{student.course}</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Contacto Directo</span>
+              <p className="text-sm text-white/90">{student.phone || 'N/A'}</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Estado Actual</span>
+              <div>
+                <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${student.is_active ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                  {student.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="md:col-span-2 space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-muted">Ubicación de Entrenamiento</span>
-            <p className="text-sm text-white/90 italic">{student.address || 'Sin dirección registrada'}</p>
+
+          {/* Columna 2: Ubicación */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Ubicación de Entrenamiento</span>
+              <p className="text-sm text-white/90 italic">{student.address || 'Sin dirección registrada'}</p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">En la Legión desde</span>
+              <p className="text-sm text-gold/80">{formatDate(student.enrollment_date)}</p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase tracking-widest text-muted">En la Legión desde</span>
-            <p className="text-sm text-gold/80">{formatDate(student.enrollment_date)}</p>
+
+          {/* Columna 3: Contacto de Emergencia - Destacado */}
+          <div className="space-y-4 p-4 rounded-lg bg-gold/5 border border-gold/20">
+            <div className="flex items-center gap-2 text-gold">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="text-[10px] uppercase tracking-widest font-bold">Contacto de Emergencia</span>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Nombre</span>
+              <p className="text-sm font-medium text-white">
+                {student.emergency_contact_name || 'No registrado'}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase tracking-widest text-muted">Teléfono</span>
+              <p className="text-lg font-bold text-gold">
+                {student.emergency_contact_phone || 'N/A'}
+              </p>
+            </div>
           </div>
         </div>
       </div>

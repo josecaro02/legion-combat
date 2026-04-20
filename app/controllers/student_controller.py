@@ -66,6 +66,13 @@ def list_students():
                     enum: [boxing, kickboxing, both]
                   is_active:
                     type: boolean
+                  emergency_contact_name:
+                    type: string
+                  emergency_contact_phone:
+                    type: string
+                  photo_url:
+                    type: string
+                    nullable: true
             total:
               type: integer
             pages:
@@ -140,6 +147,13 @@ def search_students():
                 type: string
               course:
                 type: string
+              emergency_contact_name:
+                type: string
+              emergency_contact_phone:
+                type: string
+              photo_url:
+                type: string
+                nullable: true
       400:
         description: Validation error
       401:
@@ -199,13 +213,22 @@ def get_student(student_id: UUID):
               type: string
             address:
               type: string
+              nullable: true
             phone:
               type: string
+              nullable: true
             enrollment_date:
               type: string
               format: date
             is_active:
               type: boolean
+            emergency_contact_name:
+              type: string
+            emergency_contact_phone:
+              type: string
+            photo_url:
+              type: string
+              nullable: true
       401:
         description: Unauthorized
       404:
@@ -241,6 +264,8 @@ def create_student():
             - first_name
             - last_name
             - course
+            - emergency_contact_name
+            - emergency_contact_phone
           properties:
             first_name:
               type: string
@@ -262,6 +287,16 @@ def create_student():
               type: string
               format: date
               example: "2024-03-20"
+            emergency_contact_name:
+              type: string
+              example: "María Pérez"
+            emergency_contact_phone:
+              type: string
+              example: "+56987654321"
+            photo_url:
+              type: string
+              description: Cloudinary photo URL
+              example: "https://res.cloudinary.com/your-cloud/students/photo.jpg"
     responses:
       201:
         description: Student created successfully
@@ -285,8 +320,11 @@ def create_student():
             first_name=student_data.first_name,
             last_name=student_data.last_name,
             course=student_data.course,
+            emergency_contact_name=student_data.emergency_contact_name,
+            emergency_contact_phone=student_data.emergency_contact_phone,
             address=student_data.address,
             phone=student_data.phone,
+            photo_url=student_data.photo_url,
             enrollment_date=student_data.enrollment_date
         )
         return jsonify(StudentResponse.model_validate(student).model_dump()), 201
@@ -332,6 +370,13 @@ def update_student(student_id: UUID):
               enum: [boxing, kickboxing, both]
             is_active:
               type: boolean
+            emergency_contact_name:
+              type: string
+            emergency_contact_phone:
+              type: string
+            photo_url:
+              type: string
+              description: Cloudinary photo URL (can be set to null to remove)
     responses:
       200:
         description: Student updated successfully
@@ -360,7 +405,10 @@ def update_student(student_id: UUID):
             address=student_data.address,
             phone=student_data.phone,
             course=student_data.course,
-            is_active=student_data.is_active
+            is_active=student_data.is_active,
+            emergency_contact_name=student_data.emergency_contact_name,
+            emergency_contact_phone=student_data.emergency_contact_phone,
+            photo_url=student_data.photo_url
         )
         return jsonify(StudentResponse.model_validate(student).model_dump()), 200
     except Exception as e:
@@ -525,6 +573,13 @@ def get_students_with_upcoming_payment_due():
                         type: string
                       course:
                         type: string
+                      emergency_contact_name:
+                        type: string
+                      emergency_contact_phone:
+                        type: string
+                      photo_url:
+                        type: string
+                        nullable: true
                   last_payment_date:
                     type: string
                     format: date
@@ -551,7 +606,7 @@ def get_students_with_upcoming_payment_due():
             'error': 'VALIDATION_ERROR',
             'message': 'days parameter must be between 1 and 30'
         }), 400
-    
+
     try:
         results = student_service.get_students_with_upcoming_payment_due(days=days)
 
