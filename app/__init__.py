@@ -1,4 +1,5 @@
 """Flask application factory."""
+import os
 from flask import Flask
 from flasgger import Swagger
 from flask_cors import CORS
@@ -25,9 +26,17 @@ def create_app(config: Config = None) -> Flask:
 
     app.config.from_object(config)
     
+    allowed_origins = [
+        "https://tu-app.vercel.app"
+    ]
+
+    # Permitir localhost solo en desarrollo
+    if os.getenv("FLASK_ENV") == "development":
+        allowed_origins.append("http://localhost:5173")
+
     CORS(
         app,
-        resources={r"/*": {"origins": "http://localhost:5173"}},
+        resources={r"/*": {"origins": allowed_origins}},
         supports_credentials=True
     )
 

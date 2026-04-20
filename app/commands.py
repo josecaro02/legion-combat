@@ -8,13 +8,16 @@ from app.utils.password_utils import hash_password
 
 import os
 
-email = os.environ.get("OWNER_EMAIL", "owner@gym.com")
-password = os.environ.get("OWNER_PASSWORD", "securepassword")
-
 
 @click.command("create-owner")
 @with_appcontext
 def create_owner():
+    email = os.environ.get("OWNER_EMAIL", "owner@gym.com")
+    password = os.environ.get("OWNER_PASSWORD")
+
+    if not password:
+        raise ValueError("OWNER_PASSWORD no está configurado")
+
     existing = db.session.query(User).filter_by(email=email).first()
 
     if existing:
