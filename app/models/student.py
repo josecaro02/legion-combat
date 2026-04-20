@@ -61,6 +61,18 @@ class Student(Base, TimestampMixin):
         default=True,
         nullable=False
     )
+    emergency_contact_name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False
+    )
+    emergency_contact_phone: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False
+    )
+    photo_url: Mapped[Optional[str]] = mapped_column(
+        String(500),
+        nullable=True
+    )
 
     # Relationships
     payments: Mapped[List["Payment"]] = relationship(
@@ -88,6 +100,9 @@ class Student(Base, TimestampMixin):
             'course': self.course.value,
             'enrollment_date': self.enrollment_date.isoformat(),
             'is_active': self.is_active,
+            'emergency_contact_name': self.emergency_contact_name,
+            'emergency_contact_phone': self.emergency_contact_phone,
+            'photo_url': self.photo_url,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }

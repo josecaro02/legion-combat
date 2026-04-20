@@ -18,7 +18,6 @@ function Login() {
 
     try {
       const { token, user } = await loginApi(email, password);
-      console.log(token, user);
       login(token, user);
       navigate("/dashboard");
     } catch (err) {

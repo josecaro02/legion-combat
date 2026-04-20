@@ -6,10 +6,11 @@ Sistema de gestión para gimnasio de boxeo con API REST completa.
 
 - **Autenticación JWT Avanzada**: Access tokens (15 min) + Refresh tokens (7 días) con rotación y detección de reuso
 - **Autorización RBAC**: Roles de Owner y Professor con permisos diferenciados
-- **Gestión de Estudiantes**: Registro, búsqueda, activación/desactivación
+- **Gestión de Estudiantes**: Registro, búsqueda, activación/desactivación, **contacto de emergencia** y **fotos con Cloudinary**
 - **Sistema de Pagos**: Con idempotencia, vencimientos y reportes
 - **Horarios Recurrentes**: Templates vs Instancias con generación lazy
 - **Control de Asistencia**: Registro multi-estudiante y reportes
+- **Captura de Fotos**: Integración con cámara del dispositivo y subida directa a Cloudinary
 
 ## Stack Tecnológico
 
@@ -74,6 +75,22 @@ pip install -r requirements/dev.txt
 # Configurar variables de entorno
 cp .env.example .env
 # Editar .env con tus configuraciones
+
+### Configuración de Cloudinary (para fotos de estudiantes)
+
+Para habilitar la carga de fotos, necesitas configurar Cloudinary:
+
+1. Crea una cuenta gratuita en [Cloudinary](https://cloudinary.com)
+2. Ve a Settings > Upload > Upload presets
+3. Crea un unsigned upload preset (ej: `students_unsigned`)
+4. Configura las variables de entorno en el frontend (`frontend/.env`):
+
+```env
+VITE_CLOUDINARY_CLOUD_NAME=tu_cloud_name
+VITE_CLOUDINARY_UPLOAD_PRESET=students_unsigned
+```
+
+El backend valida automáticamente que las URLs de fotos vengan de `res.cloudinary.com`.
 
 # Crear base de datos PostgreSQL (ver sección abajo)
 createdb legion_combat_dev
@@ -286,12 +303,13 @@ curl -X GET http://localhost:5000/students/ \
 
 ### Students
 - `GET /students/` - Listar estudiantes
-- `POST /students/` - Crear estudiante
+- `POST /students/` - Crear estudiante (con contacto de emergencia y foto opcional)
 - `GET /students/{id}` - Ver estudiante
-- `PUT /students/{id}` - Actualizar estudiante
+- `PUT /students/{id}` - Actualizar estudiante (incluye actualizar/eliminar foto)
 - `DELETE /students/{id}` - Eliminar estudiante
 - `POST /students/{id}/deactivate` - Desactivar
 - `POST /students/{id}/activate` - Activar
+- `GET /students/search?q={query}` - Buscar estudiantes
 
 ### Payments
 - `GET /payments/` - Listar pagos
@@ -415,19 +433,28 @@ Archivo: `src/api/students.api.js`
 ### Funciones disponibles
 
 ```javascript
-import { getStudents, createStudent, searchStudents } from '../api/students.api';
+import { getStudents, createStudent, updateStudent, searchStudents } from '../api/students.api';
 
 // Listar estudiantes (con paginación y filtros)
 const result = await getStudents(token, { page: 1, per_page: 20 });
 // Retorna: { items: [...], total: 50, pages: 3, current_page: 1 }
 
-// Crear estudiante
+// Crear estudiante (con contacto de emergencia y foto opcional)
 const newStudent = await createStudent(token, {
   first_name: 'Juan',
   last_name: 'Pérez',
   course: 'boxing', // 'boxing', 'kickboxing', 'both'
   phone: '+56912345678',
-  address: 'Av. Principal 123'
+  address: 'Av. Principal 123',
+  emergency_contact_name: 'María Pérez',      // Requerido
+  emergency_contact_phone: '+56987654321',    // Requerido
+  photo_url: 'https://res.cloudinary.com/...' // Opcional (URL de Cloudinary)
+});
+
+// Actualizar estudiante
+const updated = await updateStudent(token, studentId, {
+  phone: '+56999999999',
+  photo_url: null // Eliminar foto
 });
 
 // Buscar estudiantes
@@ -438,21 +465,123 @@ const found = await searchStudents(token, 'juan');
 
 - `GET /students/` - Listar estudiantes
 - `POST /students/` - Crear estudiante
+- `PUT /students/{id}` - Actualizar estudiante
 - `GET /students/search?q={query}` - Buscar por nombre
 - `GET /students/{id}` - Obtener estudiante específico
 - `POST /students/{id}/deactivate` - Desactivar estudiante
 - `POST /students/{id}/activate` - Activar estudiante
 
-## Página de Estudiantes
+## Captura de Fotos de Estudiantes
+
+El sistema permite capturar fotos de los estudiantes usando la cámara del dispositivo y subirlas a Cloudinary.
+
+### Flujo de Captura y Subida
+
+```
+1. Usuario hace clic en "Capturar Foto"
+2. Componente CameraCapture solicita permiso de cámara
+3. Se muestra preview en tiempo real
+4. Usuario toma la foto → Se comprime (JPEG 85%, max 1280px)
+5. Se sube directamente a Cloudinary (unsigned preset)
+6. Se recibe la URL segura → Se guarda en photo_url
+7. El formulario se envía con photo_url al backend
+```
+
+### Componente CameraCapture
+
+Archivo: `src/components/CameraCapture.jsx`
+
+```jsx
+import CameraCapture from '../components/CameraCapture';
+
+// En el formulario
+<CameraCapture
+  onCapture={handlePhotoCapture}
+  onError={handleCameraError}
+/>
+
+// Handler para captura
+async function handlePhotoCapture(file) {
+  setCapturedPhoto(file);
+  setIsUploading(true);
+
+  try {
+    const result = await uploadStudentPhoto(file);
+    setFormData(prev => ({ ...prev, photo_url: result.secure_url }));
+    setUploadSuccess(true);
+  } catch (err) {
+    setUploadError(err.message);
+    setCapturedPhoto(null);
+  } finally {
+    setIsUploading(false);
+  }
+}
+```
+
+### Utilidad Cloudinary
+
+Archivo: `src/utils/cloudinary.js`
+
+```javascript
+import { uploadStudentPhoto, isCloudinaryConfigured } from '../utils/cloudinary';
+
+// Verificar si Cloudinary está configurado
+if (!isCloudinaryConfigured()) {
+  console.warn('Cloudinary no está configurado');
+}
+
+// Subir foto (comprime + sube)
+const result = await uploadStudentPhoto(file);
+// Resultado: { secure_url, public_id, width, height, format, size }
+```
+
+### Configuración de Cloudinary
+
+Las variables deben estar en `frontend/.env`:
+
+```env
+VITE_CLOUDINARY_CLOUD_NAME=tu_cloud_name
+VITE_CLOUDINARY_UPLOAD_PRESET=students_unsigned
+```
+
+**Requisitos del Upload Preset:**
+- Debe ser "unsigned" (no requiere API secret en frontend)
+- Configurar folder: `students/`
+- Opcional: Límites de tamaño y formato
+
+### Página de Estudiantes
 
 Archivo: `src/pages/Students.jsx`
 
 ### Funcionalidades
 
-- **Listado**: Tabla con todos los estudiantes (nombre, apellido, curso, estado)
+- **Listado**: Tabla con todos los estudiantes (foto, nombre, contacto de emergencia, curso, estado)
 - **Permisos**: Solo usuarios con `canViewStudents` pueden ver la página
-- **Creación**: Formulario condicional visible solo para `canCreateStudent`
+- **Creación**: Formulario con campos de contacto de emergencia (requeridos) y foto opcional
+- **Búsqueda**: Búsqueda en tiempo real con debounce
 - **Estados**: Maneja loading, error y mensajes de éxito
+
+### Guía de Registro de Estudiante con Foto
+
+1. **Acceder a la página de estudiantes** (requiere permiso `canCreateStudent`)
+2. **Click en "Nuevo Estudiante"** para abrir el formulario
+3. **Sección "Foto del Guerrero"**:
+   - Click en "Capturar Foto"
+   - Permitir acceso a la cámara
+   - Ajustar el encuadre y click en "Capturar"
+   - Preview de la foto con opción de "Tomar otra"
+   - La foto se sube automáticamente a Cloudinary
+4. **Sección "Datos Personales"**:
+   - Completar nombre, apellido, teléfono, dirección, curso
+5. **Sección "Contacto de Emergencia"** (obligatorio):
+   - Nombre del contacto (ej: "María Pérez (Madre)")
+   - Teléfono del contacto (ej: "+56987654321")
+6. **Click en "Guardar"**
+
+La foto aparecerá en:
+- La lista de estudiantes (miniatura circular)
+- El detalle del estudiante (foto más grande)
+- Si no hay foto, se muestran las iniciales del nombre
 
 ### Componente
 
@@ -473,7 +602,7 @@ function Students() {
   if (!canView) return <div>No tienes permiso</div>;
 
   return (
-    // Lista de estudiantes + formulario condicional
+    // Lista de estudiantes + formulario con foto y contacto de emergencia
   );
 }
 ```

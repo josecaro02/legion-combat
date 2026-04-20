@@ -48,3 +48,31 @@ export async function authPost(endpoint, body, token) {
 
   return data;
 }
+
+/**
+ * Make authenticated PUT request
+ * @param {string} endpoint
+ * @param {object} body
+ * @param {string} token - JWT token
+ * @returns {Promise<any>}
+ */
+export async function authPut(endpoint, body, token) {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || data.error || 'Request failed');
+  }
+
+  return data;
+}
+
+
