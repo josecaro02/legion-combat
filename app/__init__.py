@@ -27,7 +27,7 @@ def create_app(config: Config = None) -> Flask:
     app.config.from_object(config)
     
     allowed_origins = [
-        "https://legion-combat.vercel.app"
+        "https://legion-combat-xwxxfbjoe-josecaro02s-projects.vercel.app"
     ]
 
     # Permitir localhost solo en desarrollo
