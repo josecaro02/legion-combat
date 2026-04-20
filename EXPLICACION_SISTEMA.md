@@ -6,10 +6,11 @@
 2. [Sistema de Autenticación JWT](#sistema-de-autenticación-jwt)
 3. [Sistema de Horarios Recurrentes](#sistema-de-horarios-recurrentes)
 4. [Sistema de Pagos](#sistema-de-pagos)
-5. [Decisiones de Diseño](#decisiones-de-diseño)
-6. [Escalabilidad](#escalabilidad)
-7. [Errores Comunes y Cómo Evitarlos](#errores-comunes-y-cómo-evitarlos)
-8. [Buenas Prácticas Aplicadas](#buenas-prácticas-aplicadas)
+5. [Gestión de Estudiantes](#gestión-de-estudiantes)
+6. [Decisiones de Diseño](#decisiones-de-diseño)
+7. [Escalabilidad](#escalabilidad)
+8. [Errores Comunes y Cómo Evitarlos](#errores-comunes-y-cómo-evitarlos)
+9. [Buenas Prácticas Aplicadas](#buenas-prácticas-aplicadas)
 
 ---
 
@@ -529,6 +530,104 @@ El sistema implementa idempotencia mediante la clave `idempotency_key`. Esto sig
 idempotency_key = f"payment-{student_id}-{mes}-{año}"
 # Ejemplo: "payment-123e4567-...-03-2024"
 ```
+
+---
+
+## Gestión de Estudiantes
+
+### Modelo de Datos
+
+El modelo `Student` almacena la información de los estudiantes del gimnasio:
+
+```python
+class Student:
+    id: UUID                    # Identificador único
+    first_name: str             # Nombre
+    last_name: str              # Apellido
+    course: CourseType          # Tipo de curso (boxing, kickboxing, both)
+    phone: Optional[str]        # Teléfono de contacto
+    address: Optional[str]      # Dirección
+    enrollment_date: date       # Fecha de inscripción
+    is_active: bool             # Estado del estudiante
+    emergency_contact_name: str    # Nombre del contacto de emergencia (requerido)
+    emergency_contact_phone: str   # Teléfono del contacto de emergencia (requerido)
+    photo_url: Optional[str]        # URL de la foto en Cloudinary (opcional)
+```
+
+### Campos de Contacto de Emergencia
+
+Los campos `emergency_contact_name` y `emergency_contact_phone` son obligatorios al crear un estudiante. Esto garantiza que siempre haya un contacto disponible en caso de emergencia médica durante el entrenamiento.
+
+**Validaciones:**
+- `emergency_contact_name`: mínimo 1 carácter, máximo 100
+- `emergency_contact_phone`: mínimo 7 caracteres, máximo 20, formato validado
+
+### Flujo de Fotos de Estudiantes
+
+El sistema implementa un flujo de captura y almacenamiento de fotos mediante integración con Cloudinary:
+
+```
+Cámara del dispositivo
+         ↓
+    [CameraCapture.jsx]
+         ↓
+    Captura con getUserMedia()
+         ↓
+    Canvas → Compresión JPEG 85%
+         ↓
+    [cloudinary.js]
+         ↓
+    Subida directa a Cloudinary (unsigned preset)
+         ↓
+    URL segura devuelta
+         ↓
+    [Backend] Guarda photo_url en BD
+         ↓
+    [Frontend] Muestra foto desde Cloudinary
+```
+
+#### Responsabilidades del Frontend
+
+1. **CameraCapture.jsx**: Componente que accede a la cámara del dispositivo
+   - Solicita permisos de cámara al usuario
+   - Muestra preview en tiempo real
+   - Captura foto y la convierte a Blob JPEG con calidad 85%
+   - Permite "retake" (volver a tomar) antes de confirmar
+
+2. **cloudinary.js**: Utilidad de subida de imágenes
+   - `compressImage()`: Redimensiona a máximo 1280x1280px
+   - Convierte a JPEG con calidad 85%
+   - Recomprime si excede 2MB
+   - `uploadToCloudinary()`: Sube usando unsigned upload preset
+   - `uploadStudentPhoto()`: Flujo completo compresión + subida
+
+#### Responsabilidades del Backend
+
+1. **Validación de photo_url**: El schema valida que:
+   - Sea una URL válida
+   - Contenga `res.cloudinary.com` (solo imágenes de Cloudinary aceptadas)
+
+2. **Almacenamiento**: Guarda la URL recibida tal cual en el campo `photo_url`
+
+3. **Respuestas**: Incluye `photo_url` en todos los endpoints GET de estudiantes
+
+### Compresión y Optimización de Imágenes
+
+El sistema aplica compresión en múltiples capas:
+
+1. **Captura**: Canvas con calidad JPEG 0.85 (CameraCapture.jsx)
+2. **Redimensión**: Máximo 1280x1280px manteniendo aspect ratio
+3. **Recompresión**: Si excede 2MB, baja calidad progresivamente hasta 0.3
+4. **Formato**: Todas las imágenes se convierten a JPEG
+
+**Objetivo**: Balance entre calidad visual y tamaño de archivo para carga rápida.
+
+### Preview de Imágenes
+
+- **Pre-upload**: Muestra preview local con `URL.createObjectURL()`
+- **Loading state**: Spinner durante la subida a Cloudinary
+- **Success feedback**: Check verde cuando se confirma la subida
+- **Error handling**: Mensaje de error con opción de reintentar
 
 ---
 
@@ -1117,6 +1216,29 @@ El endpoint requiere:
 | Parámetro | Tipo | Default | Descripción |
 |-----------|------|---------|-------------|
 | `days` | int | 5 | Días hacia adelante para buscar pagos próximos a vencer (1-30) |
+
+---
+
+## Limitaciones Conocidas
+
+### Imágenes Huérfanas en Cloudinary
+
+**Situación**: Cuando un usuario registra un estudiante con foto:
+
+1. Frontend sube la imagen a Cloudinary (obtiene URL)
+2. Frontend envía datos del estudiante + photo_url al backend
+3. Si el backend falla (error de validación, BD caída, etc.), el estudiante NO se guarda
+4. Sin embargo, la imagen SÍ existe en Cloudinary
+
+**Resultado**: Imágenes "huérfanas" en Cloudinary sin referencia en la base de datos.
+
+**Decisión**: Este es un **trade-off aceptado** por diseño:
+- No se implementó mecanismo de cleanup automático
+- El backend no gestiona el almacenamiento de Cloudinary
+- Solo valida que la URL venga de Cloudinary (`res.cloudinary.com`)
+- El costo de imágenes huérfanas es menor que la complejidad de un sistema de rollback
+
+**Mitigación**: Las imágenes en Cloudinary tienen un costo muy bajo y pueden limpiarse periódicamente mediante scripts externos si es necesario.
 
 ---
 
