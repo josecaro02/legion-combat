@@ -8,8 +8,7 @@ blinker==1.9.0
 # --- Base de Datos (PostgreSQL) ---
 SQLAlchemy>=2.0.36
 Flask-SQLAlchemy==3.1.1
-psycopg[binary]
-psycopg-pool
+psycopg2-binary==2.9.9
 alembic==1.12.1
 greenlet==3.3.2
 
