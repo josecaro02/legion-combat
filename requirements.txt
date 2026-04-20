@@ -49,8 +49,8 @@ psycopg2-binary==2.9.9
 ptyprocess==0.7.0
 pure_eval==0.2.3
 pycodestyle==2.11.1
-pydantic==2.5.0
-pydantic_core==2.14.1
+pydantic>=2.0.0
+pydantic_core>=2.0.0
 pyflakes==3.1.0
 Pygments==2.19.2
 PyJWT==2.8.0
