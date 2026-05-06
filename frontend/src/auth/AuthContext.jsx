@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { clearAuth as clearAuthApi } from '../api/auth';
 
 const AuthContext = createContext(null);
 
@@ -9,7 +10,7 @@ export function AuthProvider({ children }) {
 
   // Load from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
+    const storedToken = localStorage.getItem('access_token');
     const storedUser = localStorage.getItem('user');
 
     if (storedToken && storedUser) {
@@ -17,7 +18,8 @@ export function AuthProvider({ children }) {
       try {
         setUser(JSON.parse(storedUser));
       } catch {
-        localStorage.removeItem('token');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
       }
     }
@@ -25,15 +27,16 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (newToken, newUser) => {
-    localStorage.setItem('token', newToken);
+    // El token ya se guarda en localStorage por loginApi
+    // Solo necesitamos actualizar el estado
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    // Limpiar ambos tokens y redirigir
+    clearAuthApi();
     setToken(null);
     setUser(null);
   };
