@@ -35,6 +35,7 @@ class Config:
     @classmethod
     def get_swagger_template(cls) -> dict:
         """Get Swagger template configuration."""
+        schemes = ['https', 'http'] if cls.FLASK_ENV == 'production' else ['http', 'https']
         return {
             'swagger': '2.0',
             'info': {
@@ -48,7 +49,7 @@ class Config:
             },
             'host': '',  # Will be auto-detected
             'basePath': '/',
-            'schemes': ['http', 'https'],
+            'schemes': schemes,
             'securityDefinitions': {
                 'Bearer': {
                     'type': 'apiKey',
@@ -82,7 +83,7 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     """Testing configuration."""
-
+    FLASK_ENV = 'development'
     TESTING: bool = True
     DEBUG: bool = True
     SQLALCHEMY_DATABASE_URI: str = 'postgresql://postgres:postgres@localhost:5432/legion_combat_test'
@@ -96,7 +97,7 @@ class ProductionConfig(Config):
     """Production configuration."""
 
     DEBUG: bool = False
-
+    FLASK_ENV = 'production'
     def __init__(self):
         """Validate production settings."""
         super().__init__()
