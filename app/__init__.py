@@ -27,7 +27,8 @@ def create_app(config: Config = None) -> Flask:
     app.config.from_object(config)
     
     allowed_origins = [
-        "https://legion-combat.vercel.app"
+        "https://legion-combat.vercel.app",
+        "https://web-production-7f818.up.railway.app"   
     ]
 
     # Permitir localhost solo en desarrollo
@@ -36,7 +37,11 @@ def create_app(config: Config = None) -> Flask:
 
     CORS(
         app,
-        resources={r"/*": {"origins": allowed_origins}},
+        resources={r"/*": {
+            "origins": allowed_origins,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }},
         supports_credentials=True
     )
 
