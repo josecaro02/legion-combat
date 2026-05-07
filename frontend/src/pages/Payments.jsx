@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { quickPay, getPayments } from '../api/payments.api';
 import { getStudents, getUpcomingPayments } from '../api/students.api';
@@ -63,7 +63,7 @@ function Payments() {
     try {
       setLoading(true);
       setError(null);
-      const result = await getPayments(token);
+      const result = await getPayments();
       setPayments(result.items || []);
     } catch (err) {
       setError(err.message || 'Error al cargar pagos');
@@ -74,7 +74,7 @@ function Payments() {
 
   async function loadStudents() {
     try {
-      const result = await getStudents(token);
+      const result = await getStudents();
       setStudents(result.items || []);
     } catch (err) {
       console.error('Error loading students:', err);
@@ -116,7 +116,7 @@ function Payments() {
         notes: formData.notes || undefined,
       };
 
-      const result = await quickPay(token, data);
+      const result = await quickPay(data);
 
       setLastPayment(result);
       setFormSuccess(true);
@@ -162,7 +162,7 @@ function Payments() {
     setUpcomingLoading(true);
     setUpcomingError(null);
     try {
-      const result = await getUpcomingPayments(token);
+      const result = await getUpcomingPayments();
       setUpcomingData(result);
       setUpcomingShowList(true);
     } catch (err) {

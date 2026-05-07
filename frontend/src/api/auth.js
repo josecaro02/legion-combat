@@ -1,3 +1,5 @@
+import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from '../auth/constants';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 /**
@@ -24,11 +26,15 @@ export async function login(email, password) {
 
   // Persistir ambos tokens en localStorage
   if (data.access_token) {
-    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
   }
   if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
   }
+
+  // Calcular y guardar expiry (24 horas desde now)
+  const expiry = Date.now() + 24 * 60 * 60 * 1000;
+  localStorage.setItem('legion_expiry', expiry);
 
   return {
     token: data.access_token,
@@ -46,7 +52,7 @@ export async function login(email, password) {
  * @throws {Error} On failed refresh
  */
 export async function refreshAccessToken() {
-  const refreshToken = localStorage.getItem('refresh_token');
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
   if (!refreshToken) {
     throw new Error('No refresh token available');
@@ -67,11 +73,15 @@ export async function refreshAccessToken() {
 
   // Actualizar tokens en localStorage
   if (data.access_token) {
-    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
   }
   if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token);
+    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
   }
+
+  // Actualizar expiry
+  const expiry = Date.now() + 24 * 60 * 60 * 1000;
+  localStorage.setItem('legion_expiry', expiry);
 
   return {
     access_token: data.access_token,
@@ -80,10 +90,59 @@ export async function refreshAccessToken() {
 }
 
 /**
- * Clear all auth tokens from localStorage
+ * Clear all auth tokens from localStorage and redirect to login
+ * @param {boolean} redirect - Whether to redirect to login (default: true)
  */
-export function clearAuth() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
+export function clearAuth(redirect = true) {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem('legion_expiry');
+
+  if (redirect) {
+    window.location.href = '/login';
+  }
+}
+
+/**
+ * Check if the current session is expired
+ * @returns {boolean}
+ */
+export function isTokenExpired() {
+  const storedExpiry = localStorage.getItem('legion_expiry');
+  if (!storedExpiry) return true;
+
+  const expiry = parseInt(storedExpiry, 10);
+  return Date.now() > expiry;
+}
+
+/**
+ * Get the current access token from localStorage
+ * @returns {string|null}
+ */
+export function getAccessToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+/**
+ * Get the current refresh token from localStorage
+ * @returns {string|null}
+ */
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+/**
+ * Get stored user data from localStorage
+ * @returns {object|null}
+ */
+export function getUser() {
+  const userStr = localStorage.getItem(USER_KEY);
+  if (!userStr) return null;
+
+  try {
+    return JSON.parse(userStr);
+  } catch {
+    return null;
+  }
 }

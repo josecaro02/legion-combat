@@ -1,27 +1,25 @@
-import { authGet, authPost } from './client';
+import { fetchGet, fetchPost } from '../utils/fetchWrapper';
 
 const ENDPOINT = '/payments';
 
 /**
  * Quick Pay - Create payment and mark as paid in one operation
- * @param {string} token - JWT token
  * @param {Object} data - Payment data
  * @param {string} data.student_id - Student UUID
  * @param {number} data.amount - Payment amount
  * @param {string} [data.notes] - Optional notes
  * @returns {Promise<Object>} Created payment with status "paid"
  */
-export async function quickPay(token, data) {
-  return authPost(`${ENDPOINT}/quick-pay`, data, token);
+export async function quickPay(data) {
+  return fetchPost(`${ENDPOINT}/quick-pay`, data);
 }
 
 /**
  * Get list of payments
- * @param {string} token - JWT token
  * @param {Object} params - Query parameters
  * @returns {Promise<{items: Array, total: number, pages: number, current_page: number}>}
  */
-export async function getPayments(token, params = {}) {
+export async function getPayments(params = {}) {
   const queryParams = new URLSearchParams();
 
   if (params.page) queryParams.append('page', params.page);
@@ -31,17 +29,16 @@ export async function getPayments(token, params = {}) {
   const queryString = queryParams.toString();
   const url = queryString ? `${ENDPOINT}/?${queryString}` : `${ENDPOINT}/`;
 
-  return authGet(url, token);
+  return fetchGet(url);
 }
 
 /**
  * Get payments for a specific student
- * @param {string} token - JWT token
  * @param {string} studentId - Student UUID
  * @param {Object} params - Query parameters
  * @returns {Promise<{items: Array, total: number, pages: number, current_page: number}>}
  */
-export async function getStudentPayments(token, studentId, params = {}) {
+export async function getStudentPayments(studentId, params = {}) {
   const queryParams = new URLSearchParams();
 
   if (params.page) queryParams.append('page', params.page);
@@ -53,15 +50,14 @@ export async function getStudentPayments(token, studentId, params = {}) {
     ? `${ENDPOINT}/student/${studentId}?${queryString}`
     : `${ENDPOINT}/student/${studentId}`;
 
-  return authGet(url, token);
+  return fetchGet(url);
 }
 
 /**
  * Get a single payment by ID
- * @param {string} token - JWT token
  * @param {string} paymentId - Payment UUID
  * @returns {Promise<Object>}
  */
-export async function getPayment(token, paymentId) {
-  return authGet(`${ENDPOINT}/${paymentId}`, token);
+export async function getPayment(paymentId) {
+  return fetchGet(`${ENDPOINT}/${paymentId}`);
 }

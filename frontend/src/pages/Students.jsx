@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { getStudents, createStudent, searchStudents } from '../api/students.api';
 import CameraCapture from '../components/CameraCapture';
@@ -87,7 +87,7 @@ function Students() {
 
     const debounceTimer = setTimeout(async () => {
       try {
-        const results = await searchStudents(token, searchTerm.trim());
+        const results = await searchStudents(searchTerm.trim());
         setSearchResults(results || []);
       } catch (err) {
         setSearchError(err.message || 'Error al buscar estudiantes');
@@ -104,7 +104,7 @@ function Students() {
     try {
       setLoading(true);
       setError(null);
-      const result = await getStudents(token);
+      const result = await getStudents();
       setStudents(result.items || []);
     } catch (err) {
       setError(err.message || 'Error al cargar estudiantes');
@@ -167,7 +167,7 @@ function Students() {
     try {
       setFormError(null);
       setFormSuccess(false);
-      await createStudent(token, formData);
+      await createStudent(formData);
       setFormSuccess(true);
       // Reset form
       setFormData({

@@ -1,78 +1,48 @@
+// DEPRECATED: Este archivo está obsoleto y se mantiene solo para compatibilidad
+// Todas las llamadas a API ahora deben usar fetchWrapper.js
+//
+// NO USAR ESTE MÓDULO - SERÁ ELIMINADO EN FUTURO
+
+import { fetchGet, fetchPost, fetchPut, fetchDelete, getAccessToken } from '../utils/fetchWrapper';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 /**
- * Make authenticated GET request
- * @param {string} endpoint
- * @param {string} token - JWT token
- * @returns {Promise<any>}
+ * @deprecated Use fetchWrapper.js functions directly
+ * Make authenticated GET request using new wrapper
  */
-export async function authGet(endpoint, token) {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || data.error || 'Request failed');
-  }
-
-  return data;
+export async function authGet(endpoint, token = null) {
+  const url = `${API_URL}${endpoint}`;
+  // Si se pasa token (old API), se ignora y se usa el del wrapper
+  return fetchGet(url);
 }
 
 /**
- * Make authenticated POST request
- * @param {string} endpoint
- * @param {object} body
- * @param {string} token - JWT token
- * @returns {Promise<any>}
+ * @deprecated Use fetchWrapper.js functions directly
+ * Make authenticated POST request using new wrapper
  */
-export async function authPost(endpoint, body, token) {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || data.error || 'Request failed');
-  }
-
-  return data;
+export async function authPost(endpoint, body, token = null) {
+  const url = `${API_URL}${endpoint}`;
+  // Si se pasa token (old API), se ignora y se usa el del wrapper
+  return fetchPost(url, body);
 }
 
 /**
- * Make authenticated PUT request
- * @param {string} endpoint
- * @param {object} body
- * @param {string} token - JWT token
- * @returns {Promise<any>}
+ * @deprecated Use fetchWrapper.js functions directly
+ * Make authenticated PUT request using new wrapper
  */
-export async function authPut(endpoint, body, token) {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || data.error || 'Request failed');
-  }
-
-  return data;
+export async function authPut(endpoint, body, token = null) {
+  const url = `${API_URL}${endpoint}`;
+  // Si se pasa token (old API), se ignora y se usa el del wrapper
+  return fetchPut(url, body);
 }
 
-
+/**
+ * @deprecated Use fetchWrapper.js functions directly
+ * Make authenticated DELETE request using new wrapper
+ */
+export async function authDelete(endpoint, token = null) {
+  const url = `${API_URL}${endpoint}`;
+  // Si se pasa token (old API), se ignora y se usa el del wrapper
+  return fetchDelete(url);
+}

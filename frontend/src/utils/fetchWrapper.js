@@ -1,3 +1,6 @@
+import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from '../auth/constants';
+import { clearAuth as clearAuthApi } from '../api/auth';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Estado del proceso de refresco
@@ -33,28 +36,29 @@ function retryPendingRequests(newAccessToken) {
 
 /**
  * Limpiar todos los tokens y redirigir a login
+ * @param {boolean} redirect - Si es false, solo limpia sin redirigir
  */
-function clearAuthAndRedirect() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
-  window.location.href = '/login';
+export function clearAuth(redirect = true) {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  clearAuthApi(redirect);
 }
 
 /**
  * Obtener el token de acceso de localStorage
  * @returns {string|null}
  */
-function getAccessToken() {
-  return localStorage.getItem('access_token');
+export function getAccessToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
 /**
  * Obtener el token de refresh de localStorage
  * @returns {string|null}
  */
-function getRefreshToken() {
-  return localStorage.getItem('refresh_token');
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 /**
@@ -65,7 +69,7 @@ async function refreshAccessToken() {
   const refreshToken = getRefreshToken();
 
   if (!refreshToken) {
-    clearAuthAndRedirect();
+    clearAuth(true);
     throw new Error('No refresh token available');
   }
 
@@ -86,10 +90,10 @@ async function refreshAccessToken() {
 
     // Guardar el nuevo token de acceso y opcionalmente el refresh
     if (data.access_token) {
-      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem(AUTH_TOKEN_KEY, data.access_token);
     }
     if (data.refresh_token) {
-      localStorage.setItem('refresh_token', data.refresh_token);
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
     }
 
     return {
@@ -97,7 +101,7 @@ async function refreshAccessToken() {
       refresh_token: data.refresh_token || refreshToken,
     };
   } catch (error) {
-    clearAuthAndRedirect();
+    clearAuth(true);
     throw error;
   }
 }
@@ -112,7 +116,7 @@ async function refreshAccessToken() {
 async function handle401Error(originalUrl, originalOptions, retryCount = 0) {
   // Si ya intentamos refresh o no hay refresh token, limpiar y redirect
   if (isRefreshing || !getRefreshToken()) {
-    clearAuthAndRedirect();
+    clearAuth(true);
     throw new Error('Session expired. Please login again.');
   }
 
@@ -147,7 +151,7 @@ async function handle401Error(originalUrl, originalOptions, retryCount = 0) {
     if (!response.ok) {
       // Si la petición reintentada falla con 401, limpiar auth
       if (response.status === 401) {
-        clearAuthAndRedirect();
+        clearAuth(true);
         throw new Error('Session expired. Please login again.');
       }
       return response;
@@ -276,11 +280,4 @@ export async function fetchDelete(url, options = {}) {
   }
 
   return response.json();
-}
-
-/**
- * Exportar función para limpiar tokens desde fuera
- */
-export function clearAuth() {
-  clearAuthAndRedirect();
 }

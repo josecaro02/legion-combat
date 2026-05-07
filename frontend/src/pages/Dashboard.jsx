@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { hasPermission } from "../utils/permissions";
-import { authGet } from "../api/client";
+import { fetchGet } from "../utils/fetchWrapper";
 import { getUpcomingPayments } from "../api/students.api";
 import UpcomingPaymentsList from "../components/UpcomingPaymentsList";
 
@@ -33,12 +33,12 @@ function Dashboard() {
 
       try {
         if (canViewStudents) {
-          const studentsData = await authGet("/students/", token);
+          const studentsData = await fetchGet("/students");
           setStudents(studentsData.items || studentsData || []);
         }
 
         if (canViewPayments) {
-          const paymentsData = await authGet("/payments/", token);
+          const paymentsData = await fetchGet("/payments");
           setPayments(paymentsData.items || paymentsData || []);
         }
       } catch (err) {
@@ -73,7 +73,7 @@ function Dashboard() {
     setUpcomingLoading(true);
     setUpcomingError(null);
     try {
-      const result = await getUpcomingPayments(token, 5);
+      const result = await getUpcomingPayments(5);
       setUpcomingData(result);
       setUpcomingShowList(true);
     } catch (err) {

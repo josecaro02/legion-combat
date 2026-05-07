@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { hasPermission } from '../utils/permissions';
 import { getStudent } from '../api/students.api';
 import { getStudentPayments } from '../api/payments.api';
@@ -38,8 +38,8 @@ function StudentDetail() {
       setError(null);
       setImageError(false);
       const [studentData, paymentsData] = await Promise.all([
-        getStudent(token, id),
-        getStudentPayments(token, id),
+        getStudent(id),
+        getStudentPayments(id),
       ]);
       setStudent(studentData);
       setPayments(paymentsData.items || []);

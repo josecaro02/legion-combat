@@ -1,14 +1,13 @@
-import { authGet, authPost, authPut } from './client';
+import { fetchGet, fetchPost, fetchPut } from '../utils/fetchWrapper';
 
 const ENDPOINT = '/students';
 
 /**
  * Get list of students
- * @param {string} token - JWT token
  * @param {Object} params - Query parameters
  * @returns {Promise<{items: Array, total: number, pages: number, current_page: number}>}
  */
-export async function getStudents(token, params = {}) {
+export async function getStudents(params = {}) {
   const queryParams = new URLSearchParams();
 
   if (params.page) queryParams.append('page', params.page);
@@ -19,12 +18,11 @@ export async function getStudents(token, params = {}) {
   const queryString = queryParams.toString();
   const url = queryString ? `${ENDPOINT}/?${queryString}` : `${ENDPOINT}/`;
 
-  return authGet(url, token);
+  return fetchGet(url);
 }
 
 /**
  * Create a new student
- * @param {string} token - JWT token
  * @param {Object} data - Student data
  * @param {string} data.first_name
  * @param {string} data.last_name
@@ -37,13 +35,12 @@ export async function getStudents(token, params = {}) {
  * @param {string} [data.enrollment_date]
  * @returns {Promise<Object>}
  */
-export async function createStudent(token, data) {
-  return authPost(ENDPOINT + '/', data, token);
+export async function createStudent(data) {
+  return fetchPost(ENDPOINT + '/', data);
 }
 
 /**
  * Update an existing student
- * @param {string} token - JWT token
  * @param {string} studentId - Student UUID
  * @param {Object} data - Student data to update
  * @param {string} [data.first_name]
@@ -57,73 +54,53 @@ export async function createStudent(token, data) {
  * @param {boolean} [data.is_active]
  * @returns {Promise<Object>}
  */
-export async function updateStudent(token, studentId, data) {
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${ENDPOINT}/${studentId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message || result.error || 'Request failed');
-  }
-
-  return result;
+export async function updateStudent(studentId, data) {
+  return fetchPut(`${ENDPOINT}/${studentId}`, data);
 }
 
 /**
  * Search students by name
- * @param {string} token - JWT token
  * @param {string} query - Search query (min 2 characters)
  * @returns {Promise<Array>}
  */
-export async function searchStudents(token, query) {
-  return authGet(`${ENDPOINT}/search?q=${encodeURIComponent(query)}`, token);
+export async function searchStudents(query) {
+  return fetchGet(`${ENDPOINT}/search?q=${encodeURIComponent(query)}`);
 }
 
 /**
  * Get a single student by ID
- * @param {string} token - JWT token
  * @param {string} studentId
  * @returns {Promise<Object>}
  */
-export async function getStudent(token, studentId) {
-  return authGet(`${ENDPOINT}/${studentId}`, token);
+export async function getStudent(studentId) {
+  return fetchGet(`${ENDPOINT}/${studentId}`);
 }
 
 
 /**
  * Deactivate a student
- * @param {string} token - JWT token
  * @param {string} studentId
  * @returns {Promise<Object>}
  */
-export async function deactivateStudent(token, studentId) {
-  return authPost(`${ENDPOINT}/${studentId}/deactivate`, {}, token);
+export async function deactivateStudent(studentId) {
+  return fetchPost(`${ENDPOINT}/${studentId}/deactivate`, {});
 }
 
 /**
  * Activate a student
- * @param {string} token - JWT token
  * @param {string} studentId
  * @returns {Promise<Object>}
  */
-export async function activateStudent(token, studentId) {
-  return authPost(`${ENDPOINT}/${studentId}/activate`, {}, token);
+export async function activateStudent(studentId) {
+  return fetchPost(`${ENDPOINT}/${studentId}/activate`, {});
 }
 
 
 /**
  * Get students with upcoming payments due within N days
- * @param {string} token - JWT token
  * @param {number} days - Number of days to look ahead (default: 5)
  * @returns {Promise<Array>}
  */
-export async function getUpcomingPayments(token, days = 5) {
-  return authGet(`${ENDPOINT}/upcoming-payments?days=${days}`, token);
+export async function getUpcomingPayments(days = 5) {
+  return fetchGet(`${ENDPOINT}/upcoming-payments?days=${days}`);
 }
