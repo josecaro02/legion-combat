@@ -37,7 +37,7 @@ def list_students():
       - name: course
         in: query
         type: string
-        enum: [boxing, kickboxing, both]
+        enum: [boxing, kickboxing, boxing_school]
         description: Filter by course type
       - name: is_active
         in: query
@@ -63,7 +63,7 @@ def list_students():
                     type: string
                   course:
                     type: string
-                    enum: [boxing, kickboxing, both]
+                    enum: [boxing, kickboxing, boxing_school]
                   is_active:
                     type: boolean
                   emergency_contact_name:
@@ -275,7 +275,7 @@ def create_student():
               example: "Pérez"
             course:
               type: string
-              enum: [boxing, kickboxing, both]
+              enum: [boxing, kickboxing, boxing_school]
               example: "boxing"
             address:
               type: string
@@ -367,7 +367,7 @@ def update_student(student_id: UUID):
               type: string
             course:
               type: string
-              enum: [boxing, kickboxing, both]
+              enum: [boxing, kickboxing, boxing_school]
             is_active:
               type: boolean
             emergency_contact_name:

@@ -84,7 +84,7 @@ class CourseType(str):
     """Course type."""
     BOXING = "boxing"
     KICKBOXING = "kickboxing"
-    BOTH = "both"
+    BOXING_SCHOOL = "boxing_school"
 
 
 class StudentCreate(BaseModel):

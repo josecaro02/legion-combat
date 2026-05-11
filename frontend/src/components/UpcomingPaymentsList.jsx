@@ -31,7 +31,7 @@ function UpcomingPaymentsList({ items }) {
     const labels = {
       boxing: 'Boxeo',
       kickboxing: 'Kickboxing',
-      both: 'Boxeo + Kickboxing',
+      boxing_school: 'Boxing School',
     };
     return labels[course] || course;
   };
