@@ -36,7 +36,7 @@ class StudentService:
         Args:
             first_name: First name
             last_name: Last name
-            course: Course type (boxing, kickboxing, both)
+            course: Course type (boxing, kickboxing, boxing_school)
             emergency_contact_name: Emergency contact name (required)
             emergency_contact_phone: Emergency contact phone (required)
             address: Optional address

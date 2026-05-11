@@ -127,6 +127,7 @@ function Students() {
       const result = await uploadStudentPhoto(file);
       setFormData(prev => ({ ...prev, photo_url: result.secure_url }));
       setUploadSuccess(true);
+      setFormError(null)
     } catch (err) {
       console.error('Upload error:', err);
       setUploadError(err.message || 'Error al subir la imagen. Intenta de nuevo.');
@@ -158,7 +159,12 @@ function Students() {
     e.preventDefault();
     if (!canCreate) return;
 
-    // Validar campos requeridos
+    
+    if (!formData.photo_url) {
+      setFormError('La foto del estudiante es obligatoria');
+      return;
+    }
+    
     if (!formData.emergency_contact_name.trim() || !formData.emergency_contact_phone.trim()) {
       setFormError('El contacto de emergencia es requerido (nombre y teléfono)');
       return;
@@ -408,7 +414,7 @@ function Students() {
                     Capturar Foto
                   </button>
                   <span className="text-xs text-muted">
-                    La foto es opcional pero recomendada
+                    * La foto es obligatoria
                   </span>
                 </div>
               )}
@@ -501,6 +507,10 @@ function Students() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
+                  required
+                  minLength={10}
+                  pattern="\d{10,}"
+                  title="Debe contener al menos 10 dígitos"
                   className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
                 />
               </div>
@@ -514,6 +524,7 @@ function Students() {
                   name="address"
                   value={formData.address}
                   onChange={handleInputChange}
+                  required
                   className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none"
                 />
               </div>
@@ -531,7 +542,7 @@ function Students() {
                 >
                   <option value="boxing" className="bg-[#1a1a1a]">BOXEO</option>
                   <option value="kickboxing" className="bg-[#1a1a1a]">KICKBOXING</option>
-                  <option value="both" className="bg-[#1a1a1a]">AMBOS</option>
+                  <option value="boxing_school" className="bg-[#1a1a1a]">BOXING SCHOOL</option>
                 </select>
               </div>
             </div>
@@ -567,7 +578,10 @@ function Students() {
                     value={formData.emergency_contact_phone}
                     onChange={handleInputChange}
                     required
-                    placeholder="Ej: +56987654321"
+                    minLength={10}
+                    pattern="\d{10,}"
+                    title="Debe contener al menos 10 dígitos"
+                    placeholder="Ej: 3123456789"
                     className="w-full rounded-lg bg-bgInput border border-border px-3 py-2.5 text-white focus:border-gold/50 focus:outline-none placeholder:text-gray-600"
                   />
                 </div>

@@ -28,7 +28,7 @@ export async function getStudents(token, params = {}) {
  * @param {Object} data - Student data
  * @param {string} data.first_name
  * @param {string} data.last_name
- * @param {string} data.course - 'boxing', 'kickboxing', or 'both'
+ * @param {string} data.course - 'boxing', 'kickboxing', or 'boxing_school'
  * @param {string} data.emergency_contact_name
  * @param {string} data.emergency_contact_phone
  * @param {string} [data.address]

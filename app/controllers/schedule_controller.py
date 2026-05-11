@@ -31,7 +31,7 @@ def list_templates():
       - name: course_type
         in: query
         type: string
-        enum: [boxing, kickboxing, both]
+        enum: [boxing, kickboxing, boxing_school]
         description: Filter by course type
       - name: is_active
         in: query
@@ -127,7 +127,7 @@ def create_template():
               example: "19:00:00"
             course_type:
               type: string
-              enum: [boxing, kickboxing, both]
+              enum: [boxing, kickboxing, boxing_school]
             max_capacity:
               type: integer
               default: 20
