@@ -18,7 +18,7 @@ class CourseType(str, PyEnum):
     """Types of courses available."""
     BOXING = "boxing"
     KICKBOXING = "kickboxing"
-    BOTH = "both"
+    BOXING_SCHOOL = "boxing_school"
 
 
 class Student(Base, TimestampMixin):

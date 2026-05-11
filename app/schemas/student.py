@@ -24,8 +24,19 @@ class StudentCreate(BaseModel):
     def validate_emergency_phone(cls, v: str) -> str:
         """Validate emergency contact phone format."""
         if v:
-            # Basic phone validation: at least 7 digits, allows +, -, spaces, parentheses
-            phone_pattern = r'^[\d\+\-\(\)\s]{7,20}$'
+            # Basic phone validation: at least 10 digits, allows +, -, spaces, parentheses
+            phone_pattern = r'^[\d\+\-\(\)\s]{10,20}$'
+            if not re.match(phone_pattern, v):
+                raise ValueError('Invalid phone number format')
+        return v
+    
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        """Validate student phone format."""
+        if v:
+            # Basic phone validation: at least 10 digits, allows +, -, spaces, parentheses
+            phone_pattern = r'^[\d\+\-\(\)\s]{10,20}$'
             if not re.match(phone_pattern, v):
                 raise ValueError('Invalid phone number format')
         return v

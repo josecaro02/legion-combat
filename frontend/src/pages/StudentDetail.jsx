@@ -160,8 +160,8 @@ function StudentDetail() {
               <p className="text-muted text-sm mt-1">
                 {student.course === 'boxing' && 'Boxeador'}
                 {student.course === 'kickboxing' && 'Kickboxer'}
-                {student.course === 'both' && 'Artista Marcial'}
-                {' '}de la Legión
+                {student.course === 'Boxing School' && 'Boxeador'}
+                {' '}de Legion
               </p>
             </div>
           </div>

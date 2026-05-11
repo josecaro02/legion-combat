@@ -41,7 +41,7 @@ def list_classes():
       - name: course_type
         in: query
         type: string
-        enum: [boxing, kickboxing, both]
+        enum: [boxing, kickboxing, boxing_school]
       - name: status
         in: query
         type: string
@@ -159,7 +159,7 @@ def get_classes_for_range():
       - name: course_type
         in: query
         type: string
-        enum: [boxing, kickboxing, both]
+        enum: [boxing, kickboxing, boxing_school]
         description: Filter by course type
     responses:
       200:
@@ -254,7 +254,7 @@ def create_instance():
               example: "19:00:00"
             course_type:
               type: string
-              enum: [boxing, kickboxing, both]
+              enum: [boxing, kickboxing, boxing_school]
             max_capacity:
               type: integer
               default: 20
