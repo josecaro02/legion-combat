@@ -35,17 +35,6 @@ function retryPendingRequests(newAccessToken) {
 }
 
 /**
- * Limpiar todos los tokens y redirigir a login
- * @param {boolean} redirect - Si es false, solo limpia sin redirigir
- */
-export function clearAuth(redirect = true) {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-  clearAuthApi(redirect);
-}
-
-/**
  * Obtener el token de acceso de localStorage
  * @returns {string|null}
  */
@@ -69,7 +58,7 @@ async function refreshAccessToken() {
   const refreshToken = getRefreshToken();
 
   if (!refreshToken) {
-    clearAuth(true);
+    clearAuthApi(true);
     throw new Error('No refresh token available');
   }
 
@@ -83,7 +72,7 @@ async function refreshAccessToken() {
     });
 
     const data = await response.json();
-
+    
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Token refresh failed');
     }
@@ -101,7 +90,7 @@ async function refreshAccessToken() {
       refresh_token: data.refresh_token || refreshToken,
     };
   } catch (error) {
-    clearAuth(true);
+    clearAuthApi(true);
     throw error;
   }
 }
@@ -114,9 +103,8 @@ async function refreshAccessToken() {
  * @returns {Promise<Response>}
  */
 async function handle401Error(originalUrl, originalOptions, retryCount = 0) {
-  // Si ya intentamos refresh o no hay refresh token, limpiar y redirect
   if (isRefreshing || !getRefreshToken()) {
-    clearAuth(true);
+    clearAuthApi(true);
     throw new Error('Session expired. Please login again.');
   }
 
@@ -151,7 +139,7 @@ async function handle401Error(originalUrl, originalOptions, retryCount = 0) {
     if (!response.ok) {
       // Si la petición reintentada falla con 401, limpiar auth
       if (response.status === 401) {
-        clearAuth(true);
+        clearAuthApi(true);
         throw new Error('Session expired. Please login again.');
       }
       return response;
@@ -191,11 +179,12 @@ export async function fetchWithAuth(url, options = {}) {
     },
   };
 
-  const response = await fetch(url, finalOptions);
+  const fullUrl = `${API_URL}${url}`;
 
-  // Si recibimos 401, intentar refrescar el token
+  const response = await fetch(fullUrl, finalOptions);
+
   if (response.status === 401) {
-    return handle401Error(url, finalOptions);
+    return handle401Error(fullUrl, finalOptions);
   }
 
   return response;

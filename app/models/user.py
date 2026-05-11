@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from typing import TYPE_CHECKING, List, Optional
 
@@ -141,7 +141,7 @@ class RefreshToken(Base, TimestampMixin):
 
     def is_expired(self) -> bool:
         """Check if token is expired."""
-        return datetime.now() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def is_revoked(self) -> bool:
         """Check if token is revoked."""

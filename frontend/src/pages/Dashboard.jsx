@@ -33,12 +33,12 @@ function Dashboard() {
 
       try {
         if (canViewStudents) {
-          const studentsData = await fetchGet("/students");
+          const studentsData = await fetchGet("/students/");
           setStudents(studentsData.items || studentsData || []);
         }
 
         if (canViewPayments) {
-          const paymentsData = await fetchGet("/payments");
+          const paymentsData = await fetchGet("/payments/");
           setPayments(paymentsData.items || paymentsData || []);
         }
       } catch (err) {

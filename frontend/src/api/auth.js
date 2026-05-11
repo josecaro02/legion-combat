@@ -1,4 +1,4 @@
-import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY } from '../auth/constants';
+import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_KEY, EXPIRY_KEY } from '../auth/constants';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -34,7 +34,7 @@ export async function login(email, password) {
 
   // Calcular y guardar expiry (24 horas desde now)
   const expiry = Date.now() + 24 * 60 * 60 * 1000;
-  localStorage.setItem('legion_expiry', expiry);
+  localStorage.setItem(EXPIRY_KEY, expiry);
 
   return {
     token: data.access_token,
@@ -81,7 +81,7 @@ export async function refreshAccessToken() {
 
   // Actualizar expiry
   const expiry = Date.now() + 24 * 60 * 60 * 1000;
-  localStorage.setItem('legion_expiry', expiry);
+  localStorage.setItem(EXPIRY_KEY, expiry);
 
   return {
     access_token: data.access_token,
@@ -97,7 +97,7 @@ export function clearAuth(redirect = true) {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  localStorage.removeItem('legion_expiry');
+  localStorage.removeItem(EXPIRY_KEY);
 
   if (redirect) {
     window.location.href = '/login';
@@ -109,7 +109,7 @@ export function clearAuth(redirect = true) {
  * @returns {boolean}
  */
 export function isTokenExpired() {
-  const storedExpiry = localStorage.getItem('legion_expiry');
+  const storedExpiry = localStorage.getItem(EXPIRY_KEY);
   if (!storedExpiry) return true;
 
   const expiry = parseInt(storedExpiry, 10);
